@@ -19,10 +19,10 @@ function Shape() {
 Shape.prototype.move = function (col, row) {
   var colWidth = 101;
   var rowHeight = 83;
-  if (!(col === undefined)) {
+  if (col !== undefined) {
     this.col = col;
   };
-  if (!(row === undefined)) {
+  if (row !== undefined) {
     this.row = row;
   };
   this.x = colWidth * this.col;
