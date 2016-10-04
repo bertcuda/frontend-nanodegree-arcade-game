@@ -6,26 +6,27 @@ function Shape() {
   // update col, row to move the shape
   // col: real number between -1 and numCols
   // row: integer number between 0 and numRows - 1
+  // x, y are canvas coordinates for the shape
+  // rowOffset is used to center the shape in the row
   this.col = 0;
   this.row = 0;
-  // canvas coordinates calculated from col, row in '.update'
   this.x = 0;
   this.y = 0;
+  this.rowOffset = 0;
 }
 
-// Move shape to game square col, row
-// Enemy x and y position will be calculated by canvasPos
+// Move shape to col, row and update canvas coordinates
 Shape.prototype.move = function (col, row) {
-  this.col = col;
-  this.row = row;
-};
-
-// Calculate canvas position of shape from col, row
-Shape.prototype.canvasPos = function (rowOffset) {
   var colWidth = 101;
   var rowHeight = 83;
+  if (!(col === undefined)) {
+    this.col = col;
+  };
+  if (!(row === undefined)) {
+    this.row = row;
+  };
   this.x = colWidth * this.col;
-  this.y = rowHeight * this.row + rowOffset;
+  this.y = rowHeight * this.row + this.rowOffset;
 };
 
 // Draw the shape on the screen, required method for game
@@ -42,6 +43,7 @@ function Enemy() {
   // The image/sprite for our enemies, this uses
   // a helper we've provided to easily load images
   this.sprite = 'images/enemy-bug.png';
+  this.rowOffset = -20;
   // Enemy speed will range from 0.5 to 2.0 before dt factor
   this.speed = 0.5 + Math.random() * 1.5;
 }
@@ -61,12 +63,12 @@ Enemy.prototype.update = function (dt) {
   // which will ensure the game runs at the same speed for
   // all computers.
   var numCols = 5;
-  var imageRowOffset = -20;
-  // Update col position and cycle to beginning of row
+  // Update col position; after moving off the row, cycle back
   var newCol = this.col + this.speed * dt;
-  this.col = newCol < numCols ? newCol : -1;
-  // Convert col position to canvas x and y coordinates
-  this.canvasPos(imageRowOffset);
+  if (newCol >= numCols) {
+    newCol = -1;
+  };
+  this.move(newCol);
   console.info('Enemy moved to square ', this.col, ', ', this.row);
   // Check for collision
   if (player.row === this.row) {
@@ -85,6 +87,7 @@ function Player() {
   // The image/sprite for our layer, this uses
   // a helper we've provided to easily load images
   this.sprite = 'images/char-boy.png';
+  this.rowOffset = -10;
   // When player wins, change image to splashing for maxSplash ticks
   this.splashing = false;
   this.maxSplash = 120;
@@ -102,29 +105,28 @@ Player.prototype.constructor = Player;
 // Parameter: dt, a time delta between ticks
 Player.prototype.update = function (dt) {
   // dt is not needed for player; action is driven by user input
-  var imageRowOffset = -10;
   // Check for win when player is at row 0 at the water
-  if (this.row === 0) {
+  if (this.row <= 0) {
     if (!this.splashing) {
       // Player has just won; start splashing
       this.splashing = true;
       this.iSplash = this.maxSplash;
       this.sprite = 'images/splash.png';
-      imageRowOffset = 60;
+      this.rowOffset = 60;
+      this.move();
     } else if (this.iSplash > 0) {
       // Keep splashing
       this.iSplash--;
-      imageRowOffset = 60;
     } else if (this.iSplash <= 0) {
       // Done splashing; reset player image and restart
-      this.sprite = 'images/char-boy.png';
       this.splashing = false;
+      this.iSplash = 0;
+      this.sprite = 'images/char-boy.png';
+      this.rowOffset = -10;
       this.move(2, 5);
+      console.info('Player moved to square ', this.col, ', ', this.row);
     }
   }
-  // Convert col position to canvas x and y coordinates
-  this.canvasPos(imageRowOffset);
-  console.info('Player moved to square ', this.col, ', ', this.row);
 };
 
 // Handle player input by updating game square col or row
@@ -140,7 +142,7 @@ Player.prototype.handleInput = function (playerInput) {
   case 'up':
     console.log("Player input: up");
     if (this.row > 0) {
-      this.row--
+      this.row--;
     };
     break;
   case 'down':
@@ -164,6 +166,7 @@ Player.prototype.handleInput = function (playerInput) {
   default:
     console.log("Player input: something else");
   }
+  this.move();
 }
 
 // Splash - subclass of Shape
@@ -175,6 +178,7 @@ function Splash() {
   // The image/sprite for our layer, this uses
   // a helper we've provided to easily load images
   this.sprite = 'images/splash.png';
+  this.rowOffset = 60;
 }
 // Splash subclass extends Shape superclass
 Splash.prototype = Object.create(Shape.prototype);
@@ -182,15 +186,14 @@ Splash.prototype.constructor = Splash;
 
 //
 // Splash subclass methods
+// NOT USED - REFACTOR FOR OTHER SHAPES
 //
 
 // Update the splash's position, required method for game
 // Parameter: dt, a time delta between ticks
 Splash.prototype.update = function (dt) {
   // dt is not needed for splash; action is driven by user input
-  var imageRowOffset = 60;
-  // Convert col position to canvas x and y coordinates
-  this.canvasPos(imageRowOffset);
+  this.move();
   console.info('Splash moved to square ', this.col, ', ', this.row);
 };
 
