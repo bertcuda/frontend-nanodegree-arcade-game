@@ -95,6 +95,7 @@ var Engine = (function (global) {
       enemy.update(dt);
     });
     player.update();
+    splash.update();
   }
 
   /* This function initially draws the "game level", it will then call
@@ -152,6 +153,8 @@ var Engine = (function (global) {
     });
 
     player.render();
+
+    splash.render();
   }
 
   /* This function does nothing but it could have been a good place to
@@ -172,8 +175,7 @@ var Engine = (function (global) {
     'images/grass-block.png',
     'images/enemy-bug.png',
     'images/char-boy.png',
-    'images/splash1.png',
-    'images/splash2.png'
+    'images/splash.png'
   ]);
   Resources.onReady(init);
 
