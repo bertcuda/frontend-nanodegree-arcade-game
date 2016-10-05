@@ -69,14 +69,37 @@ Enemy.prototype.update = function (dt) {
     newCol = -1;
   };
   this.move(newCol);
-  console.info('Enemy moved to square ', this.col, ', ', this.row);
+  // console.info('Enemy moved to square ', this.col, ', ', this.row);
   // Check for collision
   if (player.row === this.row) {
     if (Math.abs(player.col - this.col) < 0.8) {
-      player.move(2, 5);
+      if (player.state === moving) {
+        // Player has just crashed; start crashing
+        player.state = crashing;
+        player.iPause = player.maxPause;
+        player.sprite = 'images/crash.png';
+        player.rowOffset = 50;
+        player.move();
+        console.info('Player crashed ', player.col, ', ', player.row);
+      } else if (player.iPause > 0) {
+        // Keep pausing
+        player.iPause--;
+      } else if (player.iPause <= 0) {
+        // Done crashing; reset player image and restart
+        player.state = moving;
+        player.iPause = 0;
+        player.sprite = 'images/char-boy.png';
+        player.rowOffset = -10;
+        player.move(2, 5);
+        // console.info('Player moved to square ', this.col, ', ', this.row);
+      }
     };
   };
 };
+
+var moving = "moving";
+var crashing = "crashing";
+var splashing = "splashing";
 
 // Player - subclass of Shape
 // Player must avoid the enemies and reach the water
@@ -88,10 +111,10 @@ function Player() {
   // a helper we've provided to easily load images
   this.sprite = 'images/char-boy.png';
   this.rowOffset = -10;
-  // When player wins, change image to splashing for maxSplash ticks
-  this.splashing = false;
-  this.maxSplash = 120;
-  this.iSplash = 0;
+  // When player state is "crashing" or "splashing", change image and pause for maxPause ticks
+  this.state = moving;
+  this.maxPause = 60;
+  this.iPause = 0;
 }
 // Player subclass extends Shape superclass
 Player.prototype = Object.create(Shape.prototype);
@@ -107,24 +130,24 @@ Player.prototype.update = function (dt) {
   // dt is not needed for player; action is driven by user input
   // Check for win when player is at row 0 at the water
   if (this.row <= 0) {
-    if (!this.splashing) {
+    if (this.state === moving) {
       // Player has just won; start splashing
-      this.splashing = true;
-      this.iSplash = this.maxSplash;
+      this.state = splashing;
+      this.iPause = this.maxPause;
       this.sprite = 'images/splash.png';
       this.rowOffset = 60;
       this.move();
-    } else if (this.iSplash > 0) {
-      // Keep splashing
-      this.iSplash--;
-    } else if (this.iSplash <= 0) {
-      // Done splashing; reset player image and restart
-      this.splashing = false;
-      this.iSplash = 0;
+    } else if (this.iPause > 0) {
+      // Keep pausing
+      this.iPause--;
+    } else if (this.iPause <= 0) {
+      // Done pausing; reset player image and restart
+      this.state = moving;
+      this.iPause = 0;
       this.sprite = 'images/char-boy.png';
       this.rowOffset = -10;
       this.move(2, 5);
-      console.info('Player moved to square ', this.col, ', ', this.row);
+      // console.info('Player moved to square ', this.col, ', ', this.row);
     }
   }
 };
@@ -134,8 +157,8 @@ Player.prototype.update = function (dt) {
 Player.prototype.handleInput = function (playerInput) {
   var numRows = 6;
   var numCols = 5;
-  if (player.splashing) {
-    // Don't process player inputs while splashing
+  if (player.state !== moving) {
+    // Don't process player inputs while pausing
     return;
   }
   switch (playerInput) {
@@ -169,34 +192,6 @@ Player.prototype.handleInput = function (playerInput) {
   this.move();
 }
 
-// Splash - subclass of Shape
-// Splash appears briefly when player reaches the water
-function Splash() {
-  Shape.call(this); // call superclass constructor.
-  // Variables applied to each of our instances go here,
-  // we've provided one for you to get started
-  // The image/sprite for our layer, this uses
-  // a helper we've provided to easily load images
-  this.sprite = 'images/splash.png';
-  this.rowOffset = 60;
-}
-// Splash subclass extends Shape superclass
-Splash.prototype = Object.create(Shape.prototype);
-Splash.prototype.constructor = Splash;
-
-//
-// Splash subclass methods
-// NOT USED - REFACTOR FOR OTHER SHAPES
-//
-
-// Update the splash's position, required method for game
-// Parameter: dt, a time delta between ticks
-Splash.prototype.update = function (dt) {
-  // dt is not needed for splash; action is driven by user input
-  this.move();
-  console.info('Splash moved to square ', this.col, ', ', this.row);
-};
-
 // Now instantiate your objects.
 // Place all enemy objects in an array called allEnemies
 // Place the player object in a variable called player
@@ -208,9 +203,6 @@ var allEnemies = [new Enemy(), new Enemy(), new Enemy()];
 allEnemies[0].move(-1, 1);
 allEnemies[1].move(-1, 2);
 allEnemies[2].move(-1, 3);
-
-var splash = new Splash();
-splash.move(-1, 0);
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
