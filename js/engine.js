@@ -137,6 +137,9 @@ var Engine = (function (global) {
     }
 
     renderEntities();
+
+    renderMessages();
+
   }
 
   /* This function is called by the render function and is called on each game
@@ -172,9 +175,12 @@ var Engine = (function (global) {
     'images/grass-block.png',
     'images/enemy-bug.png',
     'images/char-boy.png',
-    'images/Rock.png',
-    'images/splash.png',
-    'images/crash.png'
+    'images/char-cat-girl.png',
+    'images/char-horn-girl.png',
+    'images/char-pink-girl.png',
+    'images/char-princess-girl.png',
+    'images/crash.png',
+    'images/splash.png'
   ]);
   Resources.onReady(init);
 

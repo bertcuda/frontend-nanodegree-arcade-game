@@ -1,15 +1,12 @@
 //
-// Global variables
+// Game dimensions
 //
-var numRows = 6;
-var numCols = 5;
-var colWidth = 101;
-var rowHeight = 83;
-
-// Character state transitions
-var moving = "moving";
-var crashing = "crashing";
-var splashing = "splashing";
+var game = {
+  "numRows": 6,
+  "numCols": 5,
+  "colWidth": 101,
+  "rowHeight": 83
+};
 
 //
 // Shape - superclass
@@ -25,19 +22,16 @@ function Shape() {
   this.row = 0;
   this.x = 0;
   this.y = 0;
+  this.sprite = '';
   this.rowOffset = 0;
 }
 
 // Move shape to col, row and update canvas coordinates
 Shape.prototype.move = function (col, row) {
-  if (col !== undefined) {
-    this.col = col;
-  };
-  if (row !== undefined) {
-    this.row = row;
-  };
-  this.x = colWidth * this.col;
-  this.y = rowHeight * this.row + this.rowOffset;
+  this.col = col === undefined ? this.col : col;
+  this.row = row === undefined ? this.row : row;
+  this.x = game.colWidth * this.col;
+  this.y = game.rowHeight * this.row + this.rowOffset;
 };
 
 // Draw the shape on the screen, required method for game
@@ -53,6 +47,11 @@ function Enemy() {
   // we've provided one for you to get started
   // The image/sprite for our enemies, this uses
   // a helper we've provided to easily load images
+  this.state = '';
+  this.speed = 0;
+  this.sprite = '';
+  this.rowOffset = 0;
+  // Enemy speed will range from 0.5 to 2.0 before dt factor
   this.setMoving();
 }
 // Enemy subclass extends Shape superclass
@@ -63,15 +62,6 @@ Enemy.prototype.constructor = Enemy;
 // Methods of Enemy subclass
 //
 
-// Set the "moving" state for an enemy
-Enemy.prototype.setMoving = function () {
-  this.state = moving;
-  this.sprite = 'images/enemy-bug.png';
-  this.rowOffset = -20;
-  // Enemy speed will range from 0.5 to 2.0 before dt factor
-  this.speed = 0.5 + Math.random() * 1.5;
-};
-
 // Update the enemy's position, required method for game
 // Parameter: dt, a time delta between ticks
 Enemy.prototype.update = function (dt) {
@@ -81,7 +71,7 @@ Enemy.prototype.update = function (dt) {
 
   // Update col position; after moving off the row, cycle back
   var newCol = this.col + this.speed * dt;
-  if (newCol >= numCols) {
+  if (newCol >= game.numCols) {
     newCol = -1;
   };
 
@@ -98,12 +88,36 @@ Enemy.prototype.update = function (dt) {
   };
 };
 
+// Set the "moving" state for an enemy
+Enemy.prototype.setMoving = function () {
+  this.state = moving;
+  // Enemy speed will range from 0.5 to 2.0 before dt factor
+  this.speed = 0.5 + Math.random() * 1.5;
+  this.sprite = 'images/enemy-bug.png';
+  this.rowOffset = -20;
+};
+
 // Player - subclass of Shape
 // Player must avoid the enemies and reach the water
 function Player() {
   Shape.call(this); // call superclass constructor.
   // Variables applied to each of our instances go here,
   // we've provided one for you to get started
+  // Player sprite images
+  var chars = [
+    'images/char-boy.png',
+    'images/char-cat-girl.png',
+    'images/char-horn-girl.png',
+    'images/char-pink-girl.png',
+    'images/char-princess-girl.png',
+  ];
+  this.crashTime = 5;
+  this.splashTime = 5;
+  this.char = chars[0];
+  this.state = '';
+  this.timer = 0;
+  this.sprite = '';
+  this.rowOffset = 0;
   this.setMoving();
 }
 // Player subclass extends Shape superclass
@@ -125,49 +139,51 @@ Player.prototype.update = function (dt) {
       this.move();
     }
   } else {
-    // Player state is crashing or splashing; pause and restart
-    this.pauseAndRestart(dt);
+    // Stay in alternate state until timer expires
+    if (this.chargeTime(dt) <= 0) {
+      this.setMoving();
+      this.move(2, 5);
+    }
   }
 };
+
+// Character states
+var moving = "moving";
+var crashing = "crashing";
+var splashing = "splashing";
 
 Player.prototype.setMoving = function () {
   // When player state is "moving", respond to player input
   this.state = moving;
-  this.maxPause = 5;
-  this.iPause = 0;
-  this.sprite = 'images/char-boy.png';
+  this.timer = 0;
+  this.sprite = this.char;
   this.rowOffset = -10;
 };
 
 Player.prototype.setCrashing = function () {
-  // When player state is "crashing", change image and pause for maxPause ticks without responding to player input
+  // When player state is "crashing", change image for crashTime ticks without responding to player input
   this.state = crashing;
-  this.maxPause = 5;
-  this.iPause = this.maxPause;
+  this.timer = this.crashTime;
   this.sprite = 'images/crash.png';
   this.rowOffset = 50;
 };
 
 Player.prototype.setSplashing = function () {
-  // When player state is "splashing", change image and pause for maxPause ticks without responding to player input
+  // When player state is "splashing", change image for crashTime ticks without responding to player input
   this.state = splashing;
-  this.maxPause = 5;
-  this.iPause = this.maxPause;
+  this.timer = this.splashTime;
   this.sprite = 'images/splash.png';
   this.rowOffset = 60;
 };
 
-// Pause while crashing or splashing and restart player when done
+// Deduct time and return the time remaining on the timer
 // Parameter: dt, a time delta between ticks
-Player.prototype.pauseAndRestart = function (dt) {
-  if (this.iPause > 0) {
-    // Keep counting down to finish pausing
-    this.iPause = this.iPause - 10.0 * dt;
-  } else {
-    // Done pausing; reset player image and restart
-    this.setMoving();
-    this.move(2, 5);
+Player.prototype.chargeTime = function (dt) {
+  if (this.timer > 0) {
+    // Keep counting down
+    this.timer = this.timer - 10.0 * dt;
   }
+  return this.timer;
 };
 
 // Handle player input by updating game square col or row
@@ -183,7 +199,7 @@ Player.prototype.handleInput = function (playerInput) {
     };
     break;
   case 'down':
-    if (this.row < numRows - 1) {
+    if (this.row < game.numRows - 1) {
       this.row++;
     };
     break;
@@ -193,7 +209,7 @@ Player.prototype.handleInput = function (playerInput) {
     };
     break;
   case 'right':
-    if (this.col < numCols - 1) {
+    if (this.col < game.numCols - 1) {
       this.col++;
     };
     break;
@@ -207,13 +223,28 @@ Player.prototype.handleInput = function (playerInput) {
 // Place all enemy objects in an array called allEnemies
 // Place the player object in a variable called player
 
-var player = new Player();
-player.move(2, 5);
-
 var allEnemies = [new Enemy(), new Enemy(), new Enemy()];
 allEnemies[0].move(-1, 1);
 allEnemies[1].move(-1, 2);
 allEnemies[2].move(-1, 3);
+// TO DO: use allEnemies.push() to add enemies
+
+var player = new Player();
+player.move(2, 5);
+
+function renderMessages() {
+  renderCharSelection();
+}
+
+function renderCharSelection() {
+  ctx.font = "18pt Impact";
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.fillText("Change character: Arrow keys    Select: Enter", (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 2;
+  ctx.strokeText("Change character: Arrow keys    Select: Enter", (ctx.canvas.width / 2), ctx.canvas.height - 30);
+}
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
