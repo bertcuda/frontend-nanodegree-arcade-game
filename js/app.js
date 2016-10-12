@@ -1,11 +1,16 @@
 //
-// Game dimensions
+// Game data
 //
 var game = {
   "numRows": 6,
   "numCols": 5,
   "colWidth": 101,
-  "rowHeight": 83
+  "rowHeight": 83,
+  "timer": 300,
+  "score": 0,
+  "highScore": 0,
+  "pointsStep": 10,
+  "pointsWin": 50
 };
 
 //
@@ -98,7 +103,6 @@ Enemy.prototype.update = function (dt) {
     Math.abs(player.col - this.col) < 0.7) {
     // Player has just crashed; start crashing
     player.setCrashing();
-    player.move();
   };
 };
 
@@ -118,9 +122,8 @@ function Player() {
   // Variables applied to each of our instances go here,
   // we've provided one for you to get started
   // Player sprite images
-  this.char = 0;
   this.state = undefined;
-  // this.timer = 0;
+  this.char = 0;
   this.sprite = '';
   this.rowOffset = 0;
   this.setSelecting();
@@ -187,7 +190,7 @@ Player.prototype.setSplashing = function () {
 // PlayerState - superclass
 //
 function PlayerState() {
-  // All state data is included in subclasses
+  // Superclass just used to declare class methods
 }
 
 // Update the player's position, required method for game
@@ -196,8 +199,13 @@ PlayerState.prototype.update = function (dt) {
   // no-op unless player state subclass provides it
 };
 
+// Handle player input
+PlayerState.prototype.handleInput = function (playerInput) {
+  // no-op unless player state subclass provides it
+};
+
 // Deduct time and return the time remaining on the timer
-// Useful to track time in state initiated by an event (crashing or splashing)
+// Used to track time in state initiated by an event (crash or splash)
 // Parameter: dt, a time delta between ticks
 PlayerState.prototype.chargeTime = function (dt) {
   if (this.timer > 0) {
@@ -205,11 +213,6 @@ PlayerState.prototype.chargeTime = function (dt) {
     this.timer = this.timer - 10.0 * dt;
   }
   return this.timer;
-};
-
-// Handle player input
-PlayerState.prototype.handleInput = function (playerInput) {
-  // no-op unless player state subclass provides it
 };
 
 //
@@ -228,12 +231,10 @@ PlayerSelecting.prototype.constructor = PlayerSelecting;
 PlayerSelecting.prototype.handleInput = function (playerInput) {
   switch (playerInput) {
   case 'up':
-  case 'left':
     player.char = player.char > 0 ? player.char - 1 : chars.length - 1;
     player.sprite = chars[player.char];
     break;
   case 'down':
-  case 'right':
     player.char = (player.char + 1) % chars.length;
     player.sprite = chars[player.char];
     break;
@@ -242,8 +243,6 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
     break;
   default:
   }
-  // Update player sprite on the canvas
-  player.move();
 };
 
 //
@@ -259,33 +258,48 @@ PlayerMoving.prototype = Object.create(PlayerState.prototype);
 PlayerMoving.prototype.constructor = PlayerMoving;
 
 PlayerMoving.prototype.update = function (dt) {
-  // Check for win when player is at row 0 at the water
-  if (player.row <= 0) {
-    // Player has just won; start splashing
-    player.setSplashing();
-    player.move();
-  }
+  player.move();
 };
 
 // Handle player input by updating game square col or row
 PlayerMoving.prototype.handleInput = function (playerInput) {
+  function addStepPoints() {
+    if (player.row > 0 && player.row < 4) {
+      game.score = game.score + game.pointsStep;
+    };
+  }
   switch (playerInput) {
   case 'up':
-    player.row = player.row > 0 ? player.row - 1 : player.row;
+    if (player.row > 1) {
+      player.row = player.row - 1;
+      addStepPoints();
+    } else if (player.row = 1) {
+      player.row = 0;
+      // Player has just won; start splashing
+      player.setSplashing();
+      game.score = game.score + game.pointsWin;
+    };
     break;
   case 'down':
-    player.row = player.row < game.numRows - 1 ? player.row + 1 : player.row;
+    if (player.row < game.numRows - 1) {
+      player.row = player.row + 1;
+      addStepPoints();
+    };
     break;
   case 'left':
-    player.col = player.col > 0 ? player.col - 1 : player.col;
+    if (player.col > 0) {
+      player.col = player.col - 1;
+      addStepPoints();
+    };
     break;
   case 'right':
-    player.col = player.col < game.numCols - 1 ? player.col + 1 : player.col;
+    if (player.col < game.numCols - 1) {
+      player.col = player.col + 1;
+      addStepPoints();
+    };
     break;
   default:
   }
-  // Update player sprite on the canvas
-  player.move();
 };
 
 //
@@ -306,7 +320,8 @@ PlayerCrashing.prototype.update = function (dt) {
   if (player.state.chargeTime(dt) <= 0) {
     player.setMoving();
     player.move(2, 5);
-  }
+  };
+  player.move();
 };
 
 //
@@ -327,6 +342,55 @@ PlayerSplashing.prototype.update = function (dt) {
   if (player.state.chargeTime(dt) <= 0) {
     player.setMoving();
     player.move(2, 5);
+  };
+  player.move();
+};
+
+//
+// Game messages
+//
+
+function renderMessages() {
+  // gameMessage.renderCharSelection();
+  gameMessage.renderGameStats();
+  // gameMessage.renderEndOfGameStats();
+}
+
+var gameMessage = {
+
+  "renderCharSelection": function () {
+    ctx.font = "18pt Impact";
+    ctx.fillStyle = "yellow";
+    ctx.textAlign = "center";
+    var message = "Press ▲▼ to select character / Space to start";
+    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  },
+
+  "renderGameStats": function () {
+    ctx.font = "18pt Impact";
+    ctx.fillStyle = "yellow";
+    ctx.textAlign = "center";
+    var message = "Score: " + game.score + "                  Time: " + game.timer / 5 + " seconds";
+    // Display time remaining and score
+    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  },
+
+  "renderEndOfGameStats": function () {
+    ctx.font = "18pt Impact";
+    ctx.fillStyle = "yellow";
+    ctx.textAlign = "center";
+    var message = "Score: " + game.score + "    High Score: " + game.highScore + "    Space to replay";
+    // Display time remaining and score
+    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
   }
 };
 
@@ -349,20 +413,6 @@ allEnemies[2].move(-1, 3);
 
 var player = new Player();
 player.move(2, 5);
-
-function renderMessages() {
-  renderCharSelection();
-}
-
-function renderCharSelection() {
-  ctx.font = "18pt Impact";
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.fillText("Change character: Arrow keys    Select: Enter", (ctx.canvas.width / 2), ctx.canvas.height - 30);
-  ctx.strokeStyle = "black";
-  ctx.lineWidth = 2;
-  ctx.strokeText("Change character: Arrow keys    Select: Enter", (ctx.canvas.width / 2), ctx.canvas.height - 30);
-}
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
