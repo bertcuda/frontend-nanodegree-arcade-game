@@ -6,12 +6,28 @@ var game = {
   "numCols": 5,
   "colWidth": 101,
   "rowHeight": 83,
-  "timer": 300,
-  "ticksPerSecond": 5,
+  "ticksPerSecond": 10,
+  "playingTime": 300,
+  "pointsStep": 10,
+  "pointsWin": 50,
+  "timer": 0,
   "score": 0,
   "highScore": 0,
-  "pointsStep": 10,
-  "pointsWin": 50
+  "begin": function () {
+    game.timer = game.playingTime;
+    game.score = 0;
+  },
+  "chargeTime": function (dt) {
+    if (game.timer > 0) {
+      // Keep counting down
+      game.timer = game.timer - 10.0 * dt;
+    }
+    return game.timer;
+  },
+  "end": function () {
+    game.highScore = game.score > game.highScore ? game.score : game.highScore;
+    game.timer = game.playingTime;
+  }
 };
 
 //
@@ -183,7 +199,6 @@ PlayerState.prototype.chargeTime = function (dt) {
 
 // Draw the shape on the screen, required method for game
 PlayerState.prototype.render = function () {
-  // console.log(this.sprite, player.x, player.y, player.state.rowOffset);
   ctx.drawImage(Resources.get(this.sprite), player.x, player.y);
 };
 
@@ -226,7 +241,6 @@ PlayerIdle.prototype.update = function (dt) {
         break;
       default: // do nothing for this cycle
       };
-      // console.log("Random input: ", playerInput, ", col or row: ", randomColOrRowInput, ", pos zero neg: ", randomPosZeroOrNegInput, ", timer: ", player.state[player.state.length - 1].timer, ", dt: ", dt);
       return playerInput;
     }
 
@@ -235,8 +249,6 @@ PlayerIdle.prototype.update = function (dt) {
     // Reset timer to wait for next move
     // player.setIdle();
     player.state[player.state.length - 1].timer = game.ticksPerSecond * 1;
-    // TODO: update player sprint and offset
-    // console.log("Updated: ", playerInput);
 
     switch (playerInput) {
     case 'up':
@@ -247,7 +259,7 @@ PlayerIdle.prototype.update = function (dt) {
         player.row = 0;
         // Player has just won; start splashing
         player.pushSplashing();
-        game.score = game.score + game.pointsWin + game.timer / game.ticksPerSecond;
+        game.score = game.score + game.pointsWin + Math.round(game.timer / game.ticksPerSecond);
       };
       break;
     case 'down':
@@ -273,11 +285,24 @@ PlayerIdle.prototype.update = function (dt) {
 
 // Up/down, left/right to cycle through character sprites, Space to start game
 PlayerIdle.prototype.handleInput = function (playerInput) {
-  if (playerInput = 'space') {
-    // Player wants to start a new game
+  switch (playerInput) {
+  case 'up':
+    break;
+  case 'down':
+    break;
+  case 'left':
+    break;
+  case 'right':
+    break;
+  case 'space':
     player.pushSelecting();
-    // Console.log("Selecting: ", player)
+    break;
+  default:
   }
+  // if (playerInput = 'space') {
+  //   // Player wants to start a new game
+  //   player.pushSelecting();
+  // }
 };
 
 //
@@ -311,6 +336,10 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
     player.char = (player.char + 1) % playerChars.length;
     player.state[player.state.length - 1].sprite = playerChars[player.char];
     break;
+  case 'left':
+    break;
+  case 'right':
+    break;
   case 'space':
     player.popState();
     player.pushMoving();
@@ -333,6 +362,10 @@ PlayerMoving.prototype = Object.create(PlayerState.prototype);
 PlayerMoving.prototype.constructor = PlayerMoving;
 
 PlayerMoving.prototype.update = function (dt) {
+  if (game.chargeTime(dt) <= 0) {
+    game.end();
+    player.setIdle();
+  };
   player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
@@ -352,7 +385,7 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
       player.row = 0;
       // Player has just won; start splashing
       player.pushSplashing();
-      game.score = game.score + game.pointsWin + game.timer / game.ticksPerSecond;
+      game.score = game.score + game.pointsWin + Math.round(game.timer / game.ticksPerSecond);
     };
     break;
   case 'down':
@@ -373,6 +406,9 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
       addStepPoints();
     };
     break;
+  case 'space':
+    // Ignore
+    break;
   default:
   }
 };
@@ -392,7 +428,9 @@ PlayerCrashing.prototype.constructor = PlayerCrashing;
 
 PlayerCrashing.prototype.update = function (dt) {
   // Stay in crashing state until timer expires and then restart player
-  // console.log("Crashing: ", player);
+  if (game.chargeTime(dt) <= 0) {
+    game.end();
+  };
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
@@ -415,6 +453,9 @@ PlayerSplashing.prototype.constructor = PlayerSplashing;
 
 PlayerSplashing.prototype.update = function (dt) {
   // Stay in splashing state until timer expires and then restart player
+  if (game.chargeTime(dt) <= 0) {
+    game.end();
+  };
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
@@ -447,7 +488,7 @@ Player.prototype.setIdle = function () {
 
 // Player starts cycling through character sprite images to choose one
 Player.prototype.pushSelecting = function () {
-  var timeToSelect = game.ticksPerSecond * 100;
+  var timeToSelect = game.ticksPerSecond * 30;
   this.state.push(playerState.selecting);
   this.state[this.state.length - 1].timer = timeToSelect;
   this.state[this.state.length - 1].sprite = playerChars[this.char];
@@ -491,48 +532,46 @@ Player.prototype.popState = function () {
 //
 
 function renderMessages() {
-  // gameMessage.renderCharSelection();
-  gameMessage.renderGameStats();
-  // gameMessage.renderEndOfGameStats();
+  switch (player.state[player.state.length - 1]) {
+  case playerState.idle:
+    renderIdleMessages();
+    break;
+  case playerState.selecting:
+    renderSelectingMessages();
+    break;
+  case playerState.moving:
+  case playerState.crashing:
+  case playerState.splashing:
+    renderPlayingMessages();
+    break;
+  default:
+  };
 }
 
-var gameMessage = {
+function renderMessage(message, x, y) {
+  ctx.font = "18pt Impact";
+  ctx.fillStyle = "yellow";
+  ctx.textAlign = "center";
+  ctx.fillText(message, x, y);
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 2;
+  ctx.strokeText(message, x, y);
+}
 
-  "renderCharSelection": function () {
-    ctx.font = "18pt Impact";
-    ctx.fillStyle = "yellow";
-    ctx.textAlign = "center";
-    var message = "Press ▲▼ to select character / Space to start";
-    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-  },
+function renderIdleMessages() {
+  var message = "Score: " + game.score + "    High Score: " + game.highScore + "    Space to play";
+  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+}
 
-  "renderGameStats": function () {
-    ctx.font = "18pt Impact";
-    ctx.fillStyle = "yellow";
-    ctx.textAlign = "center";
-    var message = "Score: " + game.score + "                  Time: " + game.timer / game.ticksPerSecond + " seconds";
-    // Display time remaining and score
-    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-  },
+function renderSelectingMessages() {
+  var message = "Press ▲▼ to select character / Space to start";
+  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+}
 
-  "renderEndOfGameStats": function () {
-    ctx.font = "18pt Impact";
-    ctx.fillStyle = "yellow";
-    ctx.textAlign = "center";
-    var message = "Score: " + game.score + "    High Score: " + game.highScore + "    Space to replay";
-    // Display time remaining and score
-    ctx.fillText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.strokeText(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
-  }
-};
+function renderPlayingMessages() {
+  var message = "Score: " + game.score + "                  Time: " + Math.round(game.timer / game.ticksPerSecond) + " seconds";
+  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+}
 
 // Now instantiate your objects.
 // Place all enemy objects in an array called allEnemies
@@ -553,9 +592,9 @@ allEnemies[2].move(-1, 3);
 // TODO: use allEnemies.push() to add enemies
 
 var player = new Player();
-// console.log("New: ", player.state.length, player.state.timer);
 player.setIdle();
-console.log(player.state.sprite, player.x, player.y, player.state[player.state.length - 1].rowOffset);
+
+game.begin();
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
