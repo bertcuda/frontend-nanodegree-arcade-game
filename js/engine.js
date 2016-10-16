@@ -154,7 +154,7 @@ var Engine = (function (global) {
       enemy.render();
     });
 
-    player.render();
+    player.state[player.state.length - 1].render();
   }
 
   /* This function does nothing but it could have been a good place to

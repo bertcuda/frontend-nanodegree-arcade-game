@@ -17,7 +17,7 @@ var game = {
 //
 // Player character sprites
 //
-var chars = [
+var playerChars = [
   'images/char-boy.png',
   'images/char-cat-girl.png',
   'images/char-horn-girl.png',
@@ -39,21 +39,16 @@ function Shape() {
   this.row = 0;
   this.x = 0;
   this.y = 0;
-  this.sprite = '';
-  this.rowOffset = 0;
 }
 
 // Move shape to col, row and update canvas coordinates
-Shape.prototype.move = function (col, row) {
-  this.col = col === undefined ? this.col : col;
-  this.row = row === undefined ? this.row : row;
+Shape.prototype.move = function (col, row, rowOffset) {
+  // this.col = col === undefined ? this.col : col;
+  // this.row = row === undefined ? this.row : row;
+  this.col = col;
+  this.row = row;
   this.x = game.colWidth * this.col;
-  this.y = game.rowHeight * this.row + this.rowOffset;
-};
-
-// Draw the shape on the screen, required method for game
-Shape.prototype.render = function () {
-  ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
+  this.y = game.rowHeight * this.row + rowOffset;
 };
 
 // Enemy states - only one for now
@@ -96,7 +91,7 @@ Enemy.prototype.update = function (dt) {
   };
 
   // Update position on the canvas
-  this.move(newCol);
+  this.move(newCol, this.row, this.rowOffset);
 
   // Check for collision with player
   if ((player.state[player.state.length - 1] === playerState.moving ||
@@ -104,7 +99,7 @@ Enemy.prototype.update = function (dt) {
     player.row === this.row &&
     Math.abs(player.col - this.col) < 0.7) {
     // Player has just crashed; start crashing
-    player.setCrashing();
+    player.pushCrashing();
     if (game.score > game.pointsStep) {
       game.score = game.score - game.pointsStep;
     };
@@ -120,14 +115,17 @@ Enemy.prototype.setMoving = function () {
   this.rowOffset = -20;
 };
 
+// Draw the shape on the screen, required method for game
+Enemy.prototype.render = function () {
+  ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
+};
+
 // Player - subclass of Shape
 // Player must avoid the enemies and reach the water
 function Player() {
   Shape.call(this); // call superclass constructor.
   this.state = new Array(0); // Player state is a stack of states
   this.char = 0;
-  this.sprite = '';
-  this.rowOffset = 0;
 }
 // Player subclass extends Shape superclass
 Player.prototype = Object.create(Shape.prototype);
@@ -156,8 +154,9 @@ Player.prototype.handleInput = function (playerInput) {
 //
 function PlayerState() {
   // Timer for length of time to remain in the state
-  // TODO: sprite, rowOffset and render need to be in PlayerState
   this.timer = 0;
+  this.sprite = '';
+  this.rowOffset = 0;
 }
 
 // Update the player's position, required method for game
@@ -182,13 +181,18 @@ PlayerState.prototype.chargeTime = function (dt) {
   return this.timer;
 };
 
+// Draw the shape on the screen, required method for game
+PlayerState.prototype.render = function () {
+  // console.log(this.sprite, player.x, player.y, player.state.rowOffset);
+  ctx.drawImage(Resources.get(this.sprite), player.x, player.y);
+};
+
 //
 // PlayerIdle - subclass of PlayerState
 // Player is in this state while waiting to start game / after game over
 //
 function PlayerIdle() {
   PlayerState.call(this);
-  // Subclass has no data, only subclass methods
 }
 
 // PlayerIdle subclass extends PlayerState superclass
@@ -242,7 +246,7 @@ PlayerIdle.prototype.update = function (dt) {
       } else if (player.row = 1) {
         player.row = 0;
         // Player has just won; start splashing
-        player.setSplashing();
+        player.pushSplashing();
         game.score = game.score + game.pointsWin + game.timer / game.ticksPerSecond;
       };
       break;
@@ -264,7 +268,7 @@ PlayerIdle.prototype.update = function (dt) {
     default:
     }
   };
-  player.move();
+  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 // Up/down, left/right to cycle through character sprites, Space to start game
@@ -283,6 +287,7 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
 function PlayerSelecting() {
   PlayerState.call(this);
   // Subclass has no data, only subclass methods
+  var char = 0;
 }
 
 // PlayerSelecting subclass extends PlayerState superclass
@@ -300,12 +305,12 @@ PlayerSelecting.prototype.update = function (dt) {
 PlayerSelecting.prototype.handleInput = function (playerInput) {
   switch (playerInput) {
   case 'up':
-    player.char = player.char > 0 ? player.char - 1 : chars.length - 1;
-    player.sprite = chars[player.char];
+    player.state.char = player.state.char > 0 ? player.state.char - 1 : playerChars.length - 1;
+    player.state[player.state.length - 1].sprite = playerChars[player.state.char];
     break;
   case 'down':
-    player.char = (player.char + 1) % chars.length;
-    player.sprite = chars[player.char];
+    player.state.char = (player.state.char + 1) % playerChars.length;
+    player.state[player.state.length - 1].sprite = playerChars[player.state.char];
     break;
   case 'space':
     player.popState();
@@ -329,7 +334,7 @@ PlayerMoving.prototype = Object.create(PlayerState.prototype);
 PlayerMoving.prototype.constructor = PlayerMoving;
 
 PlayerMoving.prototype.update = function (dt) {
-  player.move();
+  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 // Handle player input by updating game square col or row
@@ -347,7 +352,7 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
     } else if (player.row = 1) {
       player.row = 0;
       // Player has just won; start splashing
-      player.setSplashing();
+      player.pushSplashing();
       game.score = game.score + game.pointsWin + game.timer / game.ticksPerSecond;
     };
     break;
@@ -388,11 +393,12 @@ PlayerCrashing.prototype.constructor = PlayerCrashing;
 
 PlayerCrashing.prototype.update = function (dt) {
   // Stay in crashing state until timer expires and then restart player
+  // console.log("Crashing: ", player);
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5);
+    player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
-  player.move();
+  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 //
@@ -412,9 +418,9 @@ PlayerSplashing.prototype.update = function (dt) {
   // Stay in splashing state until timer expires and then restart player
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5);
+    player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
-  player.move();
+  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 //
@@ -433,10 +439,11 @@ Player.prototype.setIdle = function () {
     };
   };
   // Set/refresh state settings
+  this.char = 0;
   this.state[this.state.length - 1].timer = timeBetweenMoves;
-  this.char = 0
-  this.sprite = chars[this.char];
-  this.rowOffset = -10;
+  this.state[this.state.length - 1].sprite = playerChars[this.char];
+  this.state[this.state.length - 1].rowOffset = -10;
+  this.move(2, 5, this.state[this.state.length - 1].rowOffset);
 };
 
 // Player starts cycling through character sprite images to choose one
@@ -444,40 +451,40 @@ Player.prototype.pushSelecting = function () {
   var timeToSelect = game.ticksPerSecond * 10;
   this.state.push(playerState.selecting);
   this.state[this.state.length - 1].timer = timeToSelect;
-  this.sprite = chars[this.char];
-  this.rowOffset = -10;
-  this.move(2, 5);
+  this.char = 0;
+  this.state[this.state.length - 1].sprite = playerChars[this.char];
+  this.state[this.state.length - 1].rowOffset = -10;
+  this.move(2, 5, this.state[this.state.length - 1].rowOffset);
 };
 
 // Player starts moving according to input from the arrow keys
 Player.prototype.pushMoving = function () {
   this.state.push(playerState.moving);
-  this.sprite = chars[this.char];
-  this.rowOffset = -10;
+  this.state[this.state.length - 1].sprite = playerChars[this.char];
+  this.state[this.state.length - 1].rowOffset = -10;
 };
 
 // While player is "crashing", change player image for crashTime ticks without responding to player input
-Player.prototype.setCrashing = function () {
+Player.prototype.pushCrashing = function () {
   var crashTime = game.ticksPerSecond * 2;
   this.state.push(playerState.crashing);
   this.state[this.state.length - 1].timer = crashTime;
-  this.sprite = 'images/crash.png';
-  this.rowOffset = 50;
+  this.state[this.state.length - 1].sprite = 'images/crash.png';
+  this.state[this.state.length - 1].rowOffset = 50;
 };
 
 // While player is "splashing", change player image for splashTime ticks without responding to player input
-Player.prototype.setSplashing = function () {
+Player.prototype.pushSplashing = function () {
   var splashTime = game.ticksPerSecond * 2;
   this.state.push(playerState.splashing);
   this.state[this.state.length - 1].timer = splashTime;
-  this.sprite = 'images/splash.png';
-  this.rowOffset = 60;
+  this.state[this.state.length - 1].sprite = 'images/splash.png';
+  this.state[this.state.length - 1].rowOffset = 60;
 };
 
 // Player starts cycling through character sprite images to choose one
 Player.prototype.popState = function () {
   this.state.pop();
-  // TODO: refresh sprite for state at top of stack
 };
 
 //
@@ -549,8 +556,7 @@ allEnemies[2].move(-1, 3);
 var player = new Player();
 // console.log("New: ", player.state.length, player.state.timer);
 player.setIdle();
-player.move(2, 5);
-// console.log("Initialized: ", player.state.length, ", ", player.state[0], player.state.timer);
+console.log(player.state.sprite, player.x, player.y, player.state[player.state.length - 1].rowOffset);
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
