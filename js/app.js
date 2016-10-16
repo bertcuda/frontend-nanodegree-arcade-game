@@ -287,7 +287,6 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
 function PlayerSelecting() {
   PlayerState.call(this);
   // Subclass has no data, only subclass methods
-  var char = 0;
 }
 
 // PlayerSelecting subclass extends PlayerState superclass
@@ -305,12 +304,12 @@ PlayerSelecting.prototype.update = function (dt) {
 PlayerSelecting.prototype.handleInput = function (playerInput) {
   switch (playerInput) {
   case 'up':
-    player.state.char = player.state.char > 0 ? player.state.char - 1 : playerChars.length - 1;
-    player.state[player.state.length - 1].sprite = playerChars[player.state.char];
+    player.char = player.char > 0 ? player.char - 1 : playerChars.length - 1;
+    player.state[player.state.length - 1].sprite = playerChars[player.char];
     break;
   case 'down':
-    player.state.char = (player.state.char + 1) % playerChars.length;
-    player.state[player.state.length - 1].sprite = playerChars[player.state.char];
+    player.char = (player.char + 1) % playerChars.length;
+    player.state[player.state.length - 1].sprite = playerChars[player.char];
     break;
   case 'space':
     player.popState();
@@ -448,10 +447,9 @@ Player.prototype.setIdle = function () {
 
 // Player starts cycling through character sprite images to choose one
 Player.prototype.pushSelecting = function () {
-  var timeToSelect = game.ticksPerSecond * 10;
+  var timeToSelect = game.ticksPerSecond * 100;
   this.state.push(playerState.selecting);
   this.state[this.state.length - 1].timer = timeToSelect;
-  this.char = 0;
   this.state[this.state.length - 1].sprite = playerChars[this.char];
   this.state[this.state.length - 1].rowOffset = -10;
   this.move(2, 5, this.state[this.state.length - 1].rowOffset);
@@ -460,6 +458,7 @@ Player.prototype.pushSelecting = function () {
 // Player starts moving according to input from the arrow keys
 Player.prototype.pushMoving = function () {
   this.state.push(playerState.moving);
+  this.state[this.state.length - 1].timer = 0;
   this.state[this.state.length - 1].sprite = playerChars[this.char];
   this.state[this.state.length - 1].rowOffset = -10;
 };
