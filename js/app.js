@@ -155,7 +155,8 @@ Player.prototype.handleInput = function (playerInput) {
 // PlayerState - superclass
 //
 function PlayerState() {
-  // Superclass used only to declare class methods
+  // Timer for length of time to remain in the state
+  // TODO: sprite, rowOffset and render need to be in PlayerState
   this.timer = 0;
 }
 
@@ -187,6 +188,7 @@ PlayerState.prototype.chargeTime = function (dt) {
 //
 function PlayerIdle() {
   PlayerState.call(this);
+  // Subclass has no data, only subclass methods
 }
 
 // PlayerIdle subclass extends PlayerState superclass
@@ -220,7 +222,7 @@ PlayerIdle.prototype.update = function (dt) {
         break;
       default: // do nothing for this cycle
       };
-      console.log("Random input: ", playerInput, ", col or row: ", randomColOrRowInput, ", pos zero neg: ", randomPosZeroOrNegInput, ", timer: ", player.state[player.state.length - 1].timer, ", dt: ", dt);
+      // console.log("Random input: ", playerInput, ", col or row: ", randomColOrRowInput, ", pos zero neg: ", randomPosZeroOrNegInput, ", timer: ", player.state[player.state.length - 1].timer, ", dt: ", dt);
       return playerInput;
     }
 
@@ -229,7 +231,8 @@ PlayerIdle.prototype.update = function (dt) {
     // Reset timer to wait for next move
     // player.setIdle();
     player.state[player.state.length - 1].timer = game.ticksPerSecond * 1;
-    console.log("Updated: ", playerInput);
+    // TODO: update player sprint and offset
+    // console.log("Updated: ", playerInput);
 
     switch (playerInput) {
     case 'up':
@@ -244,10 +247,7 @@ PlayerIdle.prototype.update = function (dt) {
       };
       break;
     case 'down':
-      // if (player.row < game.numRows - 1) {
-      //   player.row = player.row + 1;
-      //   addStepPoints();
-      // };
+      // No-op for 'down' action; bias towards moving 'up'
       break;
     case 'left':
       if (player.col > 0) {
@@ -271,7 +271,8 @@ PlayerIdle.prototype.update = function (dt) {
 PlayerIdle.prototype.handleInput = function (playerInput) {
   if (playerInput = 'space') {
     // Player wants to start a new game
-    player.setSelecting();
+    player.pushSelecting();
+    // Console.log("Selecting: ", player)
   }
 };
 
@@ -281,11 +282,19 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
 //
 function PlayerSelecting() {
   PlayerState.call(this);
+  // Subclass has no data, only subclass methods
 }
 
 // PlayerSelecting subclass extends PlayerState superclass
 PlayerSelecting.prototype = Object.create(PlayerState.prototype);
 PlayerSelecting.prototype.constructor = PlayerSelecting;
+
+// If player takes too much time to select, go back to idle state
+PlayerSelecting.prototype.update = function (dt) {
+  if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
+    player.setIdle();
+  };
+};
 
 // Up/down, left/right to cycle through character sprites, Space to start game
 PlayerSelecting.prototype.handleInput = function (playerInput) {
@@ -299,7 +308,8 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
     player.sprite = chars[player.char];
     break;
   case 'space':
-    player.setMoving();
+    player.popState();
+    player.pushMoving();
     break;
   default:
   }
@@ -311,6 +321,7 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
 //
 function PlayerMoving() {
   PlayerState.call(this);
+  // Subclass has no data, only subclass methods
 }
 
 // PlayerMoving subclass extends PlayerState superclass
@@ -368,6 +379,7 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
 //
 function PlayerCrashing() {
   PlayerState.call(this);
+  // Subclass has no data, only subclass methods
 }
 
 // PlayerCrashing subclass extends PlayerState superclass
@@ -389,6 +401,7 @@ PlayerCrashing.prototype.update = function (dt) {
 //
 function PlayerSplashing() {
   PlayerState.call(this);
+  // Subclass has no data, only subclass methods
 }
 
 // PlayerSplashing subclass extends PlayerState superclass
@@ -415,7 +428,6 @@ Player.prototype.setIdle = function () {
   if (this.state.length === 0) {
     this.state.push(playerState.idle);
   } else {
-    console.log("Reset: player");
     while (this.state.length > 1) {
       this.state.pop();
     };
@@ -428,16 +440,17 @@ Player.prototype.setIdle = function () {
 };
 
 // Player starts cycling through character sprite images to choose one
-Player.prototype.setSelecting = function () {
-  this.state.pop();
+Player.prototype.pushSelecting = function () {
+  var timeToSelect = game.ticksPerSecond * 10;
   this.state.push(playerState.selecting);
+  this.state[this.state.length - 1].timer = timeToSelect;
   this.sprite = chars[this.char];
   this.rowOffset = -10;
+  this.move(2, 5);
 };
 
 // Player starts moving according to input from the arrow keys
-Player.prototype.setMoving = function () {
-  this.state.pop();
+Player.prototype.pushMoving = function () {
   this.state.push(playerState.moving);
   this.sprite = chars[this.char];
   this.rowOffset = -10;
@@ -459,6 +472,12 @@ Player.prototype.setSplashing = function () {
   this.state[this.state.length - 1].timer = splashTime;
   this.sprite = 'images/splash.png';
   this.rowOffset = 60;
+};
+
+// Player starts cycling through character sprite images to choose one
+Player.prototype.popState = function () {
+  this.state.pop();
+  // TODO: refresh sprite for state at top of stack
 };
 
 //
@@ -528,10 +547,10 @@ allEnemies[2].move(-1, 3);
 // TODO: use allEnemies.push() to add enemies
 
 var player = new Player();
-console.log("New: ", player.state.length, player.state.timer);
+// console.log("New: ", player.state.length, player.state.timer);
 player.setIdle();
 player.move(2, 5);
-console.log("Initialized: ", player.state.length, ", ", player.state[0], player.state.timer);
+// console.log("Initialized: ", player.state.length, ", ", player.state[0], player.state.timer);
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
