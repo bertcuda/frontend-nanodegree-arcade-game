@@ -20,11 +20,7 @@ var game = {
     game.score = 0;
   },
   "chargeTime": function (dt) {
-    if (game.timer > 0) {
-      // Keep counting down
-      game.timer = game.timer - 10.0 * dt;
-    }
-    return game.timer;
+    return game.timer = game.timer > 0 ? game.timer - 10.0 * dt : game.timer;
   },
   "end": function () {
     game.highScore = game.score > game.highScore ? game.score : game.highScore;
@@ -51,17 +47,14 @@ function Shape() {
   // col: real number between -1 and numCols
   // row: integer number between 0 and numRows - 1
   // x, y are canvas coordinates for the shape
-  // rowOffset is used to center the shape in the row
   this.col = 0;
   this.row = 0;
   this.x = 0;
   this.y = 0;
 }
 
-// Move shape to col, row and update canvas coordinates
+// Move shape to col, row and adjust y by row offset for shape
 Shape.prototype.move = function (col, row, rowOffset) {
-  // this.col = col === undefined ? this.col : col;
-  // this.row = row === undefined ? this.row : row;
   this.col = col;
   this.row = row;
   this.x = game.colWidth * this.col;
@@ -83,7 +76,6 @@ function Enemy() {
   this.speed = 0;
   this.sprite = '';
   this.rowOffset = 0;
-  // Enemy speed will range from 0.5 to 2.0 before dt factor
   this.setMoving();
 }
 // Enemy subclass extends Shape superclass
@@ -188,11 +180,7 @@ PlayerState.prototype.handleInput = function (playerInput) {
 // Used to track time in state initiated by an event (crash or splash)
 // Parameter: dt, a time delta between ticks
 PlayerState.prototype.chargeTime = function (dt) {
-  if (this.timer > 0) {
-    // Keep counting down
-    this.timer = this.timer - 10.0 * dt;
-  }
-  return this.timer;
+  return this.timer = this.timer > 0 ? this.timer - 10.0 * dt : this.timer;
 };
 
 // Draw the shape on the screen, required method for game
@@ -217,28 +205,20 @@ PlayerIdle.prototype.update = function (dt) {
 
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
 
-    // function addStepPoints() {
-    //   if (player.row > 0 && player.row < 4) {
-    //     game.score = game.score + game.pointsStep;
-    //   };
-    // }
-
     function randomPlayerInput() {
-      // Calculate a semi-random 0 or 1
-      var randomColOrRowInput = Math.round(Math.random());
-      // var randomColOrRowInput = 0;
       // Calculate a semi-random -1, 0 or 1
       var randomPosZeroOrNegInput = Math.round(Math.random() * 2) - 1;
-      // var randomPosZeroOrNegInput = -1;
       switch (randomPosZeroOrNegInput) {
-      case -1: // interpret as a left or up arrow
-        playerInput = randomColOrRowInput ? 'left' : 'up';
+      case -1:
+        playerInput = 'left';
         break;
-      case 1: // interpret as a right or down arrow
-        playerInput = randomColOrRowInput ? 'right' : 'down';
-        break;
-      default: // do nothing for this cycle
+      case 0:
         playerInput = 'up';
+        break;
+      case 1:
+        playerInput = 'right';
+        break;
+      default:
       };
       return playerInput;
     }
@@ -246,40 +226,36 @@ PlayerIdle.prototype.update = function (dt) {
     var playerInput = randomPlayerInput();
 
     // Reset timer to wait for next move
-    // player.setIdle();
     player.state[player.state.length - 1].timer = game.ticksPerSecond * 1;
 
     switch (playerInput) {
     case 'up':
       if (player.row > 1) {
         player.row = player.row - 1;
-        // addStepPoints();
       } else if (player.row === 1) {
         player.row = 0;
         // Player has just reached home; start splashing
         player.pushSplashing();
-        // game.score = game.score + game.pointsHome + Math.round(game.timer / game.ticksPerSecond);
       };
       break;
     case 'down':
-      // No-op for 'down' action; bias towards moving 'up'
+      // No-op for 'down' action (shouldn't happen)
       break;
     case 'left':
       if (player.col > 0) {
         player.col = player.col - 1;
-        // addStepPoints();
       };
       break;
     case 'right':
       if (player.col < game.numCols - 1) {
         player.col = player.col + 1;
-        // addStepPoints();
       };
       break;
     default:
     }
   };
-  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  player.move(
+    player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 // Up/down, left/right to cycle through character sprites, Space to start game
@@ -298,10 +274,6 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
     break;
   default:
   }
-  // if (playerInput = 'space') {
-  //   // Player wants to start a new game
-  //   player.pushSelecting();
-  // }
 };
 
 //
@@ -362,7 +334,8 @@ PlayerMoving.prototype = Object.create(PlayerState.prototype);
 PlayerMoving.prototype.constructor = PlayerMoving;
 
 PlayerMoving.prototype.update = function (dt) {
-  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  player.move(
+    player.col, player.row, player.state[player.state.length - 1].rowOffset);
   if (game.chargeTime(dt) <= 0) {
     game.end();
     player.setIdle();
@@ -385,7 +358,8 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
       player.row = 0;
       // Player has just reached home; start splashing
       player.pushSplashing();
-      game.score = game.score + game.pointsHome + Math.round(game.timer / game.ticksPerSecond);
+      game.score = game.score + game.pointsHome +
+        Math.round(game.timer / game.ticksPerSecond);
     };
     break;
   case 'down':
@@ -429,13 +403,12 @@ PlayerCrashing.prototype.constructor = PlayerCrashing;
 PlayerCrashing.prototype.update = function (dt) {
   // Stay in crashing state until timer expires and then restart player
   var currentTimer = player.state[player.state.length - 1].chargeTime(dt);
-  console.log("Current timer: ", currentTimer);
   if (currentTimer <= 0) {
-    console.log()
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
-  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  player.move(
+    player.col, player.row, player.state[player.state.length - 1].rowOffset);
   if (player.state[player.state.length - 2] !== playerState.idle) {
     if (game.chargeTime(dt) <= 0) {
       game.end();
@@ -460,12 +433,12 @@ PlayerSplashing.prototype.constructor = PlayerSplashing;
 PlayerSplashing.prototype.update = function (dt) {
   // Stay in splashing state until timer expires and then restart player
   var currentTimer = player.state[player.state.length - 1].chargeTime(dt);
-  console.log("Current timer: ", currentTimer);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
-  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  player.move(
+    player.col, player.row, player.state[player.state.length - 1].rowOffset);
   if (player.state[player.state.length - 2] !== playerState.idle) {
     if (game.chargeTime(dt) <= 0) {
       game.end();
@@ -521,7 +494,7 @@ Player.prototype.pushCrashing = function () {
   this.state.push(playerState.crashing);
   this.state[this.state.length - 1].timer = crashTime;
   this.state[this.state.length - 1].sprite = 'images/crash.png';
-  this.state[this.state.length - 1].rowOffset = 50;
+  this.state[this.state.length - 1].rowOffset = 45;
 };
 
 // While player is "splashing", change player image for splashTime ticks without responding to player input
@@ -530,7 +503,7 @@ Player.prototype.pushSplashing = function () {
   this.state.push(playerState.splashing);
   this.state[this.state.length - 1].timer = splashTime;
   this.state[this.state.length - 1].sprite = 'images/splash.png';
-  this.state[this.state.length - 1].rowOffset = 60;
+  this.state[this.state.length - 1].rowOffset = 50;
 };
 
 // Player starts cycling through character sprite images to choose one
@@ -614,7 +587,6 @@ var allEnemies = [new Enemy(), new Enemy(), new Enemy()];
 allEnemies[0].move(-1, 1);
 allEnemies[1].move(-1, 2);
 allEnemies[2].move(-1, 3);
-// TODO: use allEnemies.push() to add enemies
 
 var player = new Player();
 player.setIdle();
@@ -633,4 +605,4 @@ document.addEventListener('keyup', function (e) {
   };
 
   player.handleInput(allowedKeys[e.keyCode]);
-});;
+});;;
