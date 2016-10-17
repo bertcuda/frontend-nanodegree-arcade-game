@@ -7,9 +7,9 @@ var game = {
   "colWidth": 101,
   "rowHeight": 83,
   "ticksPerSecond": 10,
-  "playingTime": 300,
+  "playingTime": 100,
   "pointsStep": 10,
-  "pointsWin": 50,
+  "pointsHome": 50,
   "timer": 0,
   "score": 0,
   "highScore": 0,
@@ -18,7 +18,8 @@ var game = {
     game.score = 0;
   },
   "chargeTime": function (dt) {
-    if (game.timer > 0) {
+    if (game.timer > 0 &&
+      player.state[player.state.length - 1] !== playerState.idle) {
       // Keep counting down
       game.timer = game.timer - 10.0 * dt;
     }
@@ -26,7 +27,6 @@ var game = {
   },
   "end": function () {
     game.highScore = game.score > game.highScore ? game.score : game.highScore;
-    game.timer = game.playingTime;
   }
 };
 
@@ -116,9 +116,6 @@ Enemy.prototype.update = function (dt) {
     Math.abs(player.col - this.col) < 0.7) {
     // Player has just crashed; start crashing
     player.pushCrashing();
-    if (game.score > game.pointsStep) {
-      game.score = game.score - game.pointsStep;
-    };
   };
 };
 
@@ -219,11 +216,11 @@ PlayerIdle.prototype.update = function (dt) {
 
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
 
-    function addStepPoints() {
-      if (player.row > 0 && player.row < 4) {
-        game.score = game.score + game.pointsStep;
-      };
-    }
+    // function addStepPoints() {
+    //   if (player.row > 0 && player.row < 4) {
+    //     game.score = game.score + game.pointsStep;
+    //   };
+    // }
 
     function randomPlayerInput() {
       // Calculate a semi-random 0 or 1
@@ -254,12 +251,12 @@ PlayerIdle.prototype.update = function (dt) {
     case 'up':
       if (player.row > 1) {
         player.row = player.row - 1;
-        addStepPoints();
+        // addStepPoints();
       } else if (player.row = 1) {
         player.row = 0;
-        // Player has just won; start splashing
+        // Player has just reached home; start splashing
         player.pushSplashing();
-        game.score = game.score + game.pointsWin + Math.round(game.timer / game.ticksPerSecond);
+        // game.score = game.score + game.pointsHome + Math.round(game.timer / game.ticksPerSecond);
       };
       break;
     case 'down':
@@ -268,13 +265,13 @@ PlayerIdle.prototype.update = function (dt) {
     case 'left':
       if (player.col > 0) {
         player.col = player.col - 1;
-        addStepPoints();
+        // addStepPoints();
       };
       break;
     case 'right':
       if (player.col < game.numCols - 1) {
         player.col = player.col + 1;
-        addStepPoints();
+        // addStepPoints();
       };
       break;
     default:
@@ -343,6 +340,7 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
   case 'space':
     player.popState();
     player.pushMoving();
+    game.begin();
     break;
   default:
   }
@@ -362,11 +360,11 @@ PlayerMoving.prototype = Object.create(PlayerState.prototype);
 PlayerMoving.prototype.constructor = PlayerMoving;
 
 PlayerMoving.prototype.update = function (dt) {
+  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
   if (game.chargeTime(dt) <= 0) {
     game.end();
     player.setIdle();
   };
-  player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
 };
 
 // Handle player input by updating game square col or row
@@ -383,9 +381,9 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
       addStepPoints();
     } else if (player.row = 1) {
       player.row = 0;
-      // Player has just won; start splashing
+      // Player has just reached home; start splashing
       player.pushSplashing();
-      game.score = game.score + game.pointsWin + Math.round(game.timer / game.ticksPerSecond);
+      game.score = game.score + game.pointsHome + Math.round(game.timer / game.ticksPerSecond);
     };
     break;
   case 'down':
@@ -428,14 +426,15 @@ PlayerCrashing.prototype.constructor = PlayerCrashing;
 
 PlayerCrashing.prototype.update = function (dt) {
   // Stay in crashing state until timer expires and then restart player
-  if (game.chargeTime(dt) <= 0) {
-    game.end();
-  };
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
   player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  if (game.chargeTime(dt) <= 0) {
+    game.end();
+    player.setIdle();
+  };
 };
 
 //
@@ -453,14 +452,15 @@ PlayerSplashing.prototype.constructor = PlayerSplashing;
 
 PlayerSplashing.prototype.update = function (dt) {
   // Stay in splashing state until timer expires and then restart player
-  if (game.chargeTime(dt) <= 0) {
-    game.end();
-  };
   if (player.state[player.state.length - 1].chargeTime(dt) <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(2, 5, player.state[player.state.length - 1].rowOffset);
   };
   player.move(player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  if (game.chargeTime(dt) <= 0) {
+    game.end();
+    player.setIdle();
+  };
 };
 
 //
@@ -540,16 +540,29 @@ function renderMessages() {
     renderSelectingMessages();
     break;
   case playerState.moving:
+    renderPlayingMessages();
+    break;
   case playerState.crashing:
+    if (player.state[player.state.length - 2] === playerState.moving) {
+      renderPlayingMessages();
+    } else {
+      renderIdleMessages();
+    };
+    break;
   case playerState.splashing:
     renderPlayingMessages();
+    if (player.state[player.state.length - 2] === playerState.moving) {
+      renderPlayingMessages();
+    } else {
+      renderIdleMessages();
+    };
     break;
   default:
   };
 }
 
-function renderMessage(message, x, y) {
-  ctx.font = "18pt Impact";
+function renderMessage(message, pts, x, y) {
+  ctx.font = pts + "pt Impact";
   ctx.fillStyle = "yellow";
   ctx.textAlign = "center";
   ctx.fillText(message, x, y);
@@ -559,18 +572,20 @@ function renderMessage(message, x, y) {
 }
 
 function renderIdleMessages() {
-  var message = "Score: " + game.score + "    High Score: " + game.highScore + "    Space to play";
-  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  var message = "Bugs, Bugs, Bugs!";
+  renderMessage(message, 36, (ctx.canvas.width / 2), game.rowHeight * 2 - 55);
+  message = "Score: " + game.score + "    High Score: " + game.highScore + "    Space to play";
+  renderMessage(message, 18, (ctx.canvas.width / 2), ctx.canvas.height - 30);
 }
 
 function renderSelectingMessages() {
   var message = "Press ▲▼ to select character / Space to start";
-  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  renderMessage(message, 18, (ctx.canvas.width / 2), ctx.canvas.height - 30);
 }
 
 function renderPlayingMessages() {
   var message = "Score: " + game.score + "                  Time: " + Math.round(game.timer / game.ticksPerSecond) + " seconds";
-  renderMessage(message, (ctx.canvas.width / 2), ctx.canvas.height - 30);
+  renderMessage(message, 18, (ctx.canvas.width / 2), ctx.canvas.height - 30);
 }
 
 // Now instantiate your objects.
