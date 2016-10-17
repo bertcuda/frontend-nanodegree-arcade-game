@@ -136,14 +136,22 @@ var Engine = (function (global) {
          * so that we get the benefits of caching these images, since
          * we're using them over and over.
          */
-        ctx.drawImage(Resources.get(rowImages[row]), col * 101, row * 83);
+        ctx.drawImage(
+          Resources.get(rowImages[row]), col * 101, row * 83);
       }
     }
+
+    renderRocks();
 
     renderEntities();
 
     renderMessages();
 
+  }
+
+  function renderRocks() {
+    ctx.drawImage(Resources.get('images/Rock.png'), 1 * 101, 0 * 83 - 16);
+    ctx.drawImage(Resources.get('images/Rock.png'), 3 * 101, 0 * 83 - 16);
   }
 
   /* This function is called by the render function and is called on each game
@@ -184,7 +192,9 @@ var Engine = (function (global) {
     'images/char-pink-girl.png',
     'images/char-princess-girl.png',
     'images/crash.png',
-    'images/splash.png'
+    'images/splash.png',
+    'images/Rock.png',
+    'images/Heart.png'
   ]);
   Resources.onReady(init);
 

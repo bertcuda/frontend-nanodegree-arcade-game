@@ -127,7 +127,7 @@ Enemy.prototype.render = function () {
 };
 
 // Player - subclass of Shape
-// Player must avoid the enemies and reach the water
+// Player must avoid the enemies and reach home
 function Player() {
   Shape.call(this); // call superclass constructor.
   this.state = new Array(0); // Player state is a stack of states
@@ -234,8 +234,13 @@ PlayerIdle.prototype.update = function (dt) {
         player.row = player.row - 1;
       } else if (player.row === 1) {
         player.row = 0;
-        // Player has just reached home; start splashing
-        player.pushSplashing();
+        if (player.col === 1 || player.col === 3) {
+          // Player has just reached home; start heart
+          player.pushHome();
+        } else {
+          // Player has just fallen into the water; start splashing
+          player.pushSplashing();
+        };
       };
       break;
     case 'down':
@@ -356,10 +361,15 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
       addStepPoints();
     } else if (player.row === 1) {
       player.row = 0;
-      // Player has just reached home; start splashing
-      player.pushSplashing();
-      game.score = game.score + game.pointsHome +
-        Math.round(game.timer / game.ticksPerSecond);
+      if (player.col === 1 || player.col === 3) {
+        // Player has just reached home; start heart
+        player.pushHome();
+        game.score = game.score + game.pointsHome +
+          Math.round(game.timer / game.ticksPerSecond);
+      } else {
+        // Player has just fallen into the water; start splashing
+        player.pushSplashing();
+      };
     };
     break;
   case 'down':
@@ -419,7 +429,7 @@ PlayerCrashing.prototype.update = function (dt) {
 
 //
 // PlayerSplashing - subclass of PlayerState
-// Player is in this state while displaying the "splashing" graphic after reaching the water
+// Player is in this state while displaying the "splashing" graphic after falling in the water
 //
 function PlayerSplashing() {
   PlayerState.call(this);
@@ -448,7 +458,38 @@ PlayerSplashing.prototype.update = function (dt) {
 };
 
 //
+// PlayerHome - subclass of PlayerState
+// Player is in this state after reaching "home" (one of the rocks)
+//
+function PlayerHome() {
+  PlayerState.call(this);
+  // Subclass has no data, only subclass methods
+}
+
+// PlayerHome subclass extends PlayerState superclass
+PlayerHome.prototype = Object.create(PlayerState.prototype);
+PlayerHome.prototype.constructor = PlayerHome;
+
+PlayerHome.prototype.update = function (dt) {
+  // Stay in home state until timer expires and then restart player
+  var currentTimer = player.state[player.state.length - 1].chargeTime(dt);
+  if (currentTimer <= 0) {
+    player.state.pop(); // go back to previous idle or moving state
+    player.move(2, 5, player.state[player.state.length - 1].rowOffset);
+  };
+  player.move(
+    player.col, player.row, player.state[player.state.length - 1].rowOffset);
+  if (player.state[player.state.length - 2] !== playerState.idle) {
+    if (game.chargeTime(dt) <= 0) {
+      game.end();
+      player.setIdle();
+    };
+  };
+};
+
+//
 // State transition methods
+// TODO: generic "push" method with parameters
 //
 
 // Player automatically moves randomly until game starts
@@ -506,6 +547,15 @@ Player.prototype.pushSplashing = function () {
   this.state[this.state.length - 1].rowOffset = 50;
 };
 
+// While player is "home", change player image for splashTime ticks without responding to player input
+Player.prototype.pushHome = function () {
+  var homeTime = game.ticksPerSecond * 2;
+  this.state.push(playerState.home);
+  this.state[this.state.length - 1].timer = homeTime;
+  this.state[this.state.length - 1].sprite = 'images/Heart.png';
+  this.state[this.state.length - 1].rowOffset = 2;
+};
+
 // Player starts cycling through character sprite images to choose one
 Player.prototype.popState = function () {
   this.state.pop();
@@ -513,6 +563,7 @@ Player.prototype.popState = function () {
 
 //
 // Game messages
+// TODO: render methods should be part of state subclass
 //
 
 function renderMessages() {
@@ -534,6 +585,13 @@ function renderMessages() {
     };
     break;
   case playerState.splashing:
+    if (player.state[player.state.length - 2] === playerState.moving) {
+      renderPlayingMessages();
+    } else {
+      renderIdleMessages();
+    };
+    break;
+  case playerState.home:
     if (player.state[player.state.length - 2] === playerState.moving) {
       renderPlayingMessages();
     } else {
@@ -580,13 +638,15 @@ var playerState = {
   "selecting": new PlayerSelecting(),
   "moving": new PlayerMoving(),
   "crashing": new PlayerCrashing(),
-  "splashing": new PlayerSplashing()
+  "splashing": new PlayerSplashing(),
+  "home": new PlayerHome()
 }
 
-var allEnemies = [new Enemy(), new Enemy(), new Enemy()];
+var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
 allEnemies[0].move(-1, 1);
 allEnemies[1].move(-1, 2);
 allEnemies[2].move(-1, 3);
+allEnemies[3].move(-1, 1);
 
 var player = new Player();
 player.setIdle();
