@@ -25,9 +25,13 @@ var Engine = (function (global) {
     ctx = canvas.getContext('2d'),
     lastTime;
 
-  canvas.width = 505;
-  canvas.height = 606;
+  var scalingFactor = 1.5;
+
+  canvas.width = 505 * scalingFactor;
+  canvas.height = 606 * scalingFactor;
   doc.body.appendChild(canvas);
+
+  ctx.scale(scalingFactor, scalingFactor);
 
   /* This function serves as the kickoff point for the game loop itself
    * and handles properly calling the update and render methods.
