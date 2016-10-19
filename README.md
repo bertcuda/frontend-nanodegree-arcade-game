@@ -1,6 +1,22 @@
 frontend-nanodegree-arcade-game
 ===============================
 
-Students should use this [rubric](https://review.udacity.com/#!/projects/2696458597/rubric) for self-checking their submission. Make sure the functions you write are **object-oriented** - either class functions (like Player and Enemy) or class prototype functions such as Enemy.prototype.checkCollisions, and that the keyword 'this' is used appropriately within your class and class prototype functions to refer to the object the function is called upon. Also be sure that the **readme.md** file is updated with your instructions on both how to 1. Run and 2. Play your arcade game.
+#Bugs, Bugs, Bugs!
 
-For detailed instructions on how to get started, check out this [guide](https://docs.google.com/document/d/1v01aScPjSWCCWQLIpFqvg3-vXLH2e8_SZQKC8jNO0Dc/pub?embedded=true).
+This is a simple game modeled after the classic arcade game Frogger. The object of the game is for the player to cross a multiple-lane road to reach _home_ (a "cozy" rock), while avoiding stepping on bugs and trying not to fall into the water.
+
+#Getting Started
+
+Git users can clone the game at [frontend-nanodegree-arcade-game](https://github.com/bertcuda/frontend-nanodegree-arcade-game) into a folder on your personal computer. Alternatively, download the bugs.zip file at [frontend-nanodegree-arcade-game](https://github.com/bertcuda/frontend-nanodegree-arcade-game/bugs.zip), and unzip it into your folder. After cloning or unzipping, navigate into the `frontend-nanodegree-arcade-game` folder and open `index.html` in your browser to run the game.
+
+#How To Play
+
+The game starts in _Idle_ mode. Press the `Space` key and use the up and down arrow keys to select your character. Then press the `Space` key again to start the game.
+
+Use the arrow keys to move up towards home ("cozy" rocks), avoiding bugs along the way. Get home as many times as you can before time runs out and avoid falling into the water!
+
+#Scoring
+
+* Safe step: 10 points
+* Stepping on a bug: 0 points, lose 2 seconds
+* Arriving home: 50 points + 1 point per unused second
