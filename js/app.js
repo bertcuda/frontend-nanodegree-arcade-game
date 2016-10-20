@@ -7,7 +7,7 @@ var game = {
   "numCols": 5,
   "colWidth": 101,
   "rowHeight": 83,
-  "scalingFactor": 1.5,
+  "scalingFactor": 1.2,
   "ticksPerSecond": 10,
   "playingTime": 300,
   "pointsStep": 10,
@@ -52,7 +52,7 @@ Shape.prototype.move = function (col, row, rowOffset) {
 };
 
 //
-// Enemies our player must avoid
+// Enemies our player must avoid; control enemy speed and detect collisions
 //
 
 // Enemy states - only one for now
@@ -248,7 +248,7 @@ PlayerIdle.prototype.update = function (dt) {
     switch (playerInput) {
     case 'up':
       if (player.row > 1) {
-        player.row = player.row - 1;
+        player.row--;
       } else if (player.row === 1) {
         player.row = 0;
         if (player.col === 1 || player.col === 3) {
@@ -265,12 +265,12 @@ PlayerIdle.prototype.update = function (dt) {
       break;
     case 'left':
       if (player.col > 0) {
-        player.col = player.col - 1;
+        player.col--;
       };
       break;
     case 'right':
       if (player.col < game.numCols - 1) {
-        player.col = player.col + 1;
+        player.col++;
       };
       break;
     default:
@@ -281,9 +281,11 @@ PlayerIdle.prototype.update = function (dt) {
 };
 
 // Space to start game, ignore other inputs
-// TODO: fix crashing, splashing, and home states so that they respond to Space bar to start game while in Idle game mode
 PlayerIdle.prototype.handleInput = function (playerInput) {
   switch (playerInput) {
+  case 'space':
+    player.pushSelecting();
+    break;
   case 'up':
     break;
   case 'down':
@@ -291,9 +293,6 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
   case 'left':
     break;
   case 'right':
-    break;
-  case 'space':
-    player.pushSelecting();
     break;
   default:
   }
@@ -335,14 +334,14 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
     player.char = (player.char + 1) % playerChars.length;
     player.currentState().sprite = playerChars[player.char];
     break;
-  case 'left':
-    break;
-  case 'right':
-    break;
   case 'space':
     player.popState();
     player.pushMoving();
     game.begin();
+    break;
+  case 'left':
+    break;
+  case 'right':
     break;
   default:
   }
@@ -385,12 +384,12 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
   switch (playerInput) {
   case 'up':
     if (player.row > 1) {
-      player.row = player.row - 1;
+      player.row--;
       addStepPoints();
     } else if (player.row === 1) {
       player.row = 0;
-      if (player.col === 1 || player.col === 3) {
-        // Player has just reached home; start heart
+      if (player.col % 2) {
+        // Player has just reached home; start home state (heart)
         player.pushHome();
         game.score = game.score + game.pointsHome +
           Math.round(game.timer / game.ticksPerSecond);
@@ -402,19 +401,19 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
     break;
   case 'down':
     if (player.row < game.numRows - 1) {
-      player.row = player.row + 1;
+      player.row++;
       addStepPoints();
     };
     break;
   case 'left':
     if (player.col > 0) {
-      player.col = player.col - 1;
+      player.col--;
       addStepPoints();
     };
     break;
   case 'right':
     if (player.col < game.numCols - 1) {
-      player.col = player.col + 1;
+      player.col++;
       addStepPoints();
     };
     break;
@@ -460,6 +459,27 @@ PlayerCrashing.prototype.update = function (dt) {
   };
 };
 
+// Handle Space to start game
+PlayerCrashing.prototype.handleInput = function (playerInput) {
+  switch (playerInput) {
+  case 'space':
+    if (player.previousState() === playerState.idle) {
+      player.popState();
+      player.pushSelecting();
+    };
+    break;
+  case 'up':
+    break;
+  case 'down':
+    break;
+  case 'left':
+    break;
+  case 'right':
+    break;
+  default:
+  }
+};
+
 // Render game messages while in crashing state
 PlayerCrashing.prototype.renderMessages = function () {
   if (player.previousState() === playerState.moving) {
@@ -497,6 +517,27 @@ PlayerSplashing.prototype.update = function (dt) {
       player.setIdle();
     };
   };
+};
+
+// Handle Space to start game
+PlayerSplashing.prototype.handleInput = function (playerInput) {
+  switch (playerInput) {
+  case 'space':
+    if (player.previousState() === playerState.idle) {
+      player.popState();
+      player.pushSelecting();
+    };
+  case 'up':
+    break;
+  case 'down':
+    break;
+  case 'left':
+    break;
+  case 'right':
+    break;
+    break;
+  default:
+  }
 };
 
 // Render game messages while in splashing state
@@ -625,7 +666,6 @@ Player.prototype.popState = function () {
 
 //
 // Game messages
-// TODO: render methods should be part of state subclass
 //
 
 function renderMessages() {
@@ -663,6 +703,9 @@ function renderPlayingMessages() {
 // Place all enemy objects in an array called allEnemies
 // Place the player object in a variable called player
 
+var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
+
+var player = new Player();
 var playerState = {
   "idle": new PlayerIdle(),
   "selecting": new PlayerSelecting(),
@@ -672,16 +715,19 @@ var playerState = {
   "home": new PlayerHome()
 }
 
-var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
-allEnemies[0].move(-1, 1);
-allEnemies[1].move(-1, 2);
-allEnemies[2].move(-1, 3);
-allEnemies[3].move(-1, 1);
+function startGame() {
 
-var player = new Player();
-player.setIdle();
+  allEnemies[0].move(-1, 1);
+  allEnemies[1].move(-1, 2);
+  allEnemies[2].move(-1, 3);
+  allEnemies[3].move(-1, 1);
 
-game.begin();
+  player.setIdle();
+
+  game.begin();
+}
+
+startGame();
 
 // This listens for key presses and sends the keys to your
 // Player.handleInput() method. You don't need to modify this.
@@ -695,4 +741,4 @@ document.addEventListener('keyup', function (e) {
   };
 
   player.handleInput(allowedKeys[e.keyCode]);
-});;;
+})

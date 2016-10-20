@@ -25,7 +25,7 @@ var Engine = (function (global) {
     ctx = canvas.getContext('2d'),
     lastTime;
 
-  var scalingFactor = 1.5;
+  var scalingFactor = 1.2;
 
   canvas.width = 505 * scalingFactor;
   canvas.height = 606 * scalingFactor;
