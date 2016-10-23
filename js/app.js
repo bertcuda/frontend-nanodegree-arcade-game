@@ -18,6 +18,9 @@ var game = {
   "begin": function () {
     game.timer = game.playingTime;
     game.score = 0;
+    allBonuses.forEach(function (bonus) {
+      bonus.resetBonus();
+    })
   },
   "chargeTime": function (dt) {
     return game.timer = game.timer > 0 ? game.timer - 10.0 * dt : game.timer;
@@ -28,14 +31,12 @@ var game = {
 };
 
 //
-// Shape - superclass for player and enemy
+// Shape - superclass for enemy, bonuses and player
 //
 
 function Shape() {
   // position of shape on game grid
   // update col, row to move the shape
-  // col: real number between -1 and numCols
-  // row: integer number between 0 and numRows - 1
   // x, y are canvas coordinates for the shape
   this.col = 0;
   this.row = 0;
@@ -55,23 +56,15 @@ Shape.prototype.move = function (col, row, rowOffset) {
 // Enemies our player must avoid; control enemy speed and detect collisions
 //
 
-// Enemy states - only one for now
-var enemyState = {
-  "moving": 0
-}
-
 // Enemy - subclass of Shape
 function Enemy() {
   Shape.call(this); // call superclass constructor
-  // Variables applied to each of our instances go here,
-  // we've provided one for you to get started
   // The image/sprite for our enemies, this uses
   // a helper we've provided to easily load images
-  this.state = '';
-  this.speed = 0;
-  this.sprite = '';
-  this.rowOffset = 0;
-  this.setMoving();
+  // Enemy speed will range from 0.5 to 2.0 before dt factor
+  this.speed = 0.5 + Math.random() * 1.5;
+  this.sprite = 'images/enemy-bug.png';
+  this.rowOffset = -20;
 }
 // Enemy subclass extends Shape superclass
 Enemy.prototype = Object.create(Shape.prototype);
@@ -80,15 +73,6 @@ Enemy.prototype.constructor = Enemy;
 //
 // Methods of Enemy subclass
 //
-
-// Set the "moving" state for an enemy
-Enemy.prototype.setMoving = function () {
-  this.state = enemyState.moving;
-  // Enemy speed will range from 0.5 to 2.0 before dt factor
-  this.speed = 0.5 + Math.random() * 1.5;
-  this.sprite = 'images/enemy-bug.png';
-  this.rowOffset = -20;
-};
 
 // Draw the shape on the screen, required method for game
 Enemy.prototype.render = function () {
@@ -117,7 +101,6 @@ Enemy.prototype.update = function (dt) {
     player.row === this.row &&
     Math.abs(player.col - this.col) < 0.7) {
     // Player has just crashed; start crashing
-    // player.pushCrashing();
     player.pushCrashing();
   };
 };
@@ -127,22 +110,21 @@ Enemy.prototype.update = function (dt) {
 //
 
 // Bonus - subclass of Shape
-function Bonus(s, t) {
+function Bonus(s, t, p) {
   Shape.call(this); // call superclass constructor
-  // Variables applied to each of our instances go here,
-  // we've provided one for you to get started
-  // The image/sprite for our enemies, this uses
+  // The image/sprite for our bonuses, this uses
   // a helper we've provided to easily load images
-  this.visible = false;
-  this.beginTime = 0;
-  this.endTime = 0;
+  var visibleTime = game.ticksPerSecond * 2;
   this.bonusCol = 2;
   this.bonusRow = 2;
-  this.bonusPoints = 100;
+  this.sprite = s;
+  this.rowOffset = 25;
+  // Bonus will appear after t seconds
+  this.beginTime = game.playingTime - t * game.ticksPerSecond;
+  this.endTime = this.beginTime - visibleTime;
+  this.bonusPoints = p;
+  this.visible = false;
   this.earned = false;
-  this.sprite = '';
-  this.rowOffset = 0;
-  this.setBonus(s, t);
 }
 // Bonus subclass extends Shape superclass
 Bonus.prototype = Object.create(Shape.prototype);
@@ -152,18 +134,12 @@ Bonus.prototype.constructor = Bonus;
 // Methods of Bonus subclass
 //
 
-// Set the visibility of bonus shape
-Bonus.prototype.setBonus = function (s, t) {
-  // Bonus will appear after t seconds
-  var visibleTime = game.ticksPerSecond * 2;
-  this.col = -1;
-  this.row = 2;
+// Set the visibility and earned status of bonus shape
+Bonus.prototype.resetBonus = function () {
+  // TODO: this.col = random col
+  // TODO: this.row = random row
   this.visible = false;
-  this.beginTime = game.playingTime - t * game.ticksPerSecond;
-  this.endTime = this.beginTime - visibleTime;
   this.earned = false;
-  this.sprite = s;
-  this.rowOffset = 25;
 };
 
 // Update the bonus position, required method for game
@@ -173,14 +149,14 @@ Bonus.prototype.update = function (dt) {
   // which will ensure the game runs at the same speed for
   // all computers.
 
-  this.visible = (game.timer <= this.beginTime) && (game.timer >= this.endTime);
+  this.visible = this.earned ? false :
+    (game.timer <= this.beginTime) && (game.timer >= this.endTime);
 
   // If it's time to display bonus, make it visible
   if (this.visible) {
     this.move(this.bonusCol, this.bonusRow, this.rowOffset);
     // Check for bonus
-    if ((player.currentState() === playerState.moving ||
-        player.currentState() === playerState.idle) &&
+    if (player.currentState() === playerState.moving &&
       player.row === this.row &&
       Math.abs(player.col - this.col) < 0.7) {
       // Player has just earned bonus; display player bonus state and award points
@@ -340,9 +316,6 @@ PlayerIdle.prototype.update = function (dt) {
         };
       };
       break;
-    case 'down':
-      // No-op for 'down' action (shouldn't happen)
-      break;
     case 'left':
       if (player.col > 0) {
         player.col--;
@@ -352,6 +325,9 @@ PlayerIdle.prototype.update = function (dt) {
       if (player.col < game.numCols - 1) {
         player.col++;
       };
+      break;
+    case 'down':
+      // No-op for 'down' action (shouldn't happen)
       break;
     default:
     }
@@ -367,11 +343,8 @@ PlayerIdle.prototype.handleInput = function (playerInput) {
     player.pushSelecting();
     break;
   case 'up':
-    break;
   case 'down':
-    break;
   case 'left':
-    break;
   case 'right':
     break;
   default:
@@ -420,7 +393,6 @@ PlayerSelecting.prototype.handleInput = function (playerInput) {
     game.begin();
     break;
   case 'left':
-    break;
   case 'right':
     break;
   default:
@@ -549,11 +521,8 @@ PlayerCrashing.prototype.handleInput = function (playerInput) {
     };
     break;
   case 'up':
-    break;
   case 'down':
-    break;
   case 'left':
-    break;
   case 'right':
     break;
   default:
@@ -608,13 +577,9 @@ PlayerSplashing.prototype.handleInput = function (playerInput) {
       player.pushSelecting();
     };
   case 'up':
-    break;
   case 'down':
-    break;
   case 'left':
-    break;
   case 'right':
-    break;
     break;
   default:
   }
@@ -686,7 +651,7 @@ PlayerBonus.prototype.update = function (dt) {
   var currentTimer = player.currentState().chargeTime(dt);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5, player.currentState().rowOffset);
+    // player.move(2, 5, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -781,7 +746,7 @@ Player.prototype.pushHome = function () {
 // After player obtains a bonus, change player image for bonusTime ticks without responding to player input
 // TODO: use a generic "push" method with parameters
 Player.prototype.pushBonus = function () {
-  var bonusTime = game.ticksPerSecond * 1;
+  var bonusTime = game.ticksPerSecond * 0.25;
   this.state.push(playerState.bonus);
   this.currentState().timer = bonusTime;
   this.currentState().sprite = 'images/Star.png';
@@ -835,8 +800,10 @@ function renderPlayingMessages() {
 var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
 
 var allBonuses = [
-  new Bonus('images/Gem Blue.png', 5), new Bonus('images/Gem Green.png', 10),
-  new Bonus('images/Gem Orange.png', 15), new Bonus('images/Key.png', 20)
+  new Bonus('images/Gem Blue.png', 5, 100),
+  new Bonus('images/Gem Green.png', 10, 200),
+  new Bonus('images/Gem Orange.png', 15, 300),
+  new Bonus('images/Key.png', 20, 500)
 ];
 
 var player = new Player();
@@ -856,11 +823,6 @@ function startGame() {
   allEnemies[1].move(-1, 2);
   allEnemies[2].move(-1, 3);
   allEnemies[3].move(-1, 1);
-
-  allBonuses[0].move(-1, allBonuses[0].col);
-  allBonuses[1].move(-1, allBonuses[1].col);
-  allBonuses[2].move(-1, allBonuses[2].col);
-  allBonuses[3].move(-1, allBonuses[3].col);
 
   player.setIdle();
 

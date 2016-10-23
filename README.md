@@ -3,7 +3,7 @@ frontend-nanodegree-arcade-game
 
 #Bugs, Bugs, Bugs!
 
-This is a simple game modeled after the classic arcade game Frogger. The object of the game is for the player to cross a multiple-lane road to reach _home_ (a "cozy" rock), while avoiding stepping on bugs and trying not to fall into the water.
+This is a simple game modeled after the classic arcade game Frogger. The object of the game is for you to cross a multiple-lane road to reach _home_ (a "cozy" rock) as many times as you can. Avoid stepping on bugs and try not to fall into the water. Don't forget to grab gems and the magic key along the way!
 
 #Getting Started
 
@@ -13,10 +13,11 @@ Git users can clone the game at [frontend-nanodegree-arcade-game](https://github
 
 The game starts in _Idle_ mode. Press the `Space` key and use the up and down arrow keys to select your character. Then press the `Space` key again to start the game.
 
-Use the arrow keys to move up towards home ("cozy" rocks), avoiding bugs along the way. Get home as many times as you can before time runs out and avoid falling into the water!
-
 #Scoring
 
 * Safe step: 10 points
-* Stepping on a bug: 0 points, lose 2 seconds
 * Arriving home: 50 points + 1 point per unused second
+* Grabbing Blue Gem: 100 points
+* Grabbing Green Gem: 200 points
+* Grabbing Gold Gem: 300 points
+* Grabbing Key: 500 points
