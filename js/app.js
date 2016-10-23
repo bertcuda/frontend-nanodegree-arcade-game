@@ -56,7 +56,9 @@ Shape.prototype.move = function (col, row, rowOffset) {
 //
 
 // Enemy states - only one for now
-var moving = 'moving';
+var enemyState = {
+  "moving": 0
+}
 
 // Enemy - subclass of Shape
 function Enemy() {
@@ -78,6 +80,20 @@ Enemy.prototype.constructor = Enemy;
 //
 // Methods of Enemy subclass
 //
+
+// Set the "moving" state for an enemy
+Enemy.prototype.setMoving = function () {
+  this.state = enemyState.moving;
+  // Enemy speed will range from 0.5 to 2.0 before dt factor
+  this.speed = 0.5 + Math.random() * 1.5;
+  this.sprite = 'images/enemy-bug.png';
+  this.rowOffset = -20;
+};
+
+// Draw the shape on the screen, required method for game
+Enemy.prototype.render = function () {
+  ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
+};
 
 // Update the enemy's position, required method for game
 // Parameter: dt, a time delta between ticks
@@ -101,22 +117,86 @@ Enemy.prototype.update = function (dt) {
     player.row === this.row &&
     Math.abs(player.col - this.col) < 0.7) {
     // Player has just crashed; start crashing
+    // player.pushCrashing();
     player.pushCrashing();
   };
 };
 
-// Set the "moving" state for an enemy
-Enemy.prototype.setMoving = function () {
-  this.state = moving;
-  // Enemy speed will range from 0.5 to 2.0 before dt factor
-  this.speed = 0.5 + Math.random() * 1.5;
-  this.sprite = 'images/enemy-bug.png';
-  this.rowOffset = -20;
+//
+// Bonus shapes; appear at various times and award bonus points on collision
+//
+
+// Bonus - subclass of Shape
+function Bonus(s, t) {
+  Shape.call(this); // call superclass constructor
+  // Variables applied to each of our instances go here,
+  // we've provided one for you to get started
+  // The image/sprite for our enemies, this uses
+  // a helper we've provided to easily load images
+  this.visible = false;
+  this.beginTime = 0;
+  this.endTime = 0;
+  this.bonusCol = 2;
+  this.bonusRow = 2;
+  this.bonusPoints = 100;
+  this.earned = false;
+  this.sprite = '';
+  this.rowOffset = 0;
+  this.setBonus(s, t);
+}
+// Bonus subclass extends Shape superclass
+Bonus.prototype = Object.create(Shape.prototype);
+Bonus.prototype.constructor = Bonus;
+
+//
+// Methods of Bonus subclass
+//
+
+// Set the visibility of bonus shape
+Bonus.prototype.setBonus = function (s, t) {
+  // Bonus will appear after t seconds
+  var visibleTime = game.ticksPerSecond * 2;
+  this.col = -1;
+  this.row = 2;
+  this.visible = false;
+  this.beginTime = game.playingTime - t * game.ticksPerSecond;
+  this.endTime = this.beginTime - visibleTime;
+  this.earned = false;
+  this.sprite = s;
+  this.rowOffset = 25;
+};
+
+// Update the bonus position, required method for game
+// Parameter: dt, a time delta between ticks
+Bonus.prototype.update = function (dt) {
+  // You should multiply any movement by the dt parameter
+  // which will ensure the game runs at the same speed for
+  // all computers.
+
+  this.visible = (game.timer <= this.beginTime) && (game.timer >= this.endTime);
+
+  // If it's time to display bonus, make it visible
+  if (this.visible) {
+    this.move(this.bonusCol, this.bonusRow, this.rowOffset);
+    // Check for bonus
+    if ((player.currentState() === playerState.moving ||
+        player.currentState() === playerState.idle) &&
+      player.row === this.row &&
+      Math.abs(player.col - this.col) < 0.7) {
+      // Player has just earned bonus; display player bonus state and award points
+      player.pushBonus();
+      game.score = game.score + this.bonusPoints;
+      this.earned = true;
+    };
+  };
 };
 
 // Draw the shape on the screen, required method for game
-Enemy.prototype.render = function () {
-  ctx.drawImage(Resources.get(this.sprite), this.x, this.y);
+Bonus.prototype.render = function () {
+  if (this.visible && !this.earned) {
+    var colOffset = 20;
+    ctx.drawImage(Resources.get(this.sprite), this.x + colOffset, this.y);
+  };
 };
 
 //
@@ -589,6 +669,45 @@ PlayerHome.prototype.renderMessages = function () {
 }
 
 //
+// PlayerBonus - subclass of PlayerState
+// Player is in this state after reaching "home" (one of the rocks)
+//
+function PlayerBonus() {
+  PlayerState.call(this);
+  // Subclass has no data, only subclass methods
+}
+
+// PlayerBonus subclass extends PlayerState superclass
+PlayerBonus.prototype = Object.create(PlayerState.prototype);
+PlayerBonus.prototype.constructor = PlayerBonus;
+
+PlayerBonus.prototype.update = function (dt) {
+  // Stay in bonus state until timer expires and then resume playing
+  var currentTimer = player.currentState().chargeTime(dt);
+  if (currentTimer <= 0) {
+    player.state.pop(); // go back to previous idle or moving state
+    player.move(2, 5, player.currentState().rowOffset);
+  };
+  player.move(
+    player.col, player.row, player.currentState().rowOffset);
+  if (player.previousState() !== playerState.idle) {
+    if (game.chargeTime(dt) <= 0) {
+      game.end();
+      player.setIdle();
+    };
+  };
+};
+
+// Render game messages while in bonus state
+PlayerBonus.prototype.renderMessages = function () {
+  if (player.previousState() === playerState.moving) {
+    renderPlayingMessages();
+  } else {
+    renderIdleMessages();
+  };
+}
+
+//
 // State transition methods
 //
 
@@ -659,6 +778,16 @@ Player.prototype.pushHome = function () {
   this.currentState().rowOffset = 2;
 };
 
+// After player obtains a bonus, change player image for bonusTime ticks without responding to player input
+// TODO: use a generic "push" method with parameters
+Player.prototype.pushBonus = function () {
+  var bonusTime = game.ticksPerSecond * 1;
+  this.state.push(playerState.bonus);
+  this.currentState().timer = bonusTime;
+  this.currentState().sprite = 'images/Star.png';
+  this.currentState().rowOffset = -10;
+};
+
 // Player starts cycling through character sprite images to choose one
 Player.prototype.popState = function () {
   this.state.pop();
@@ -705,6 +834,11 @@ function renderPlayingMessages() {
 
 var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
 
+var allBonuses = [
+  new Bonus('images/Gem Blue.png', 5), new Bonus('images/Gem Green.png', 10),
+  new Bonus('images/Gem Orange.png', 15), new Bonus('images/Key.png', 20)
+];
+
 var player = new Player();
 var playerState = {
   "idle": new PlayerIdle(),
@@ -712,8 +846,9 @@ var playerState = {
   "moving": new PlayerMoving(),
   "crashing": new PlayerCrashing(),
   "splashing": new PlayerSplashing(),
-  "home": new PlayerHome()
-}
+  "home": new PlayerHome(),
+  "bonus": new PlayerBonus()
+};
 
 function startGame() {
 
@@ -721,6 +856,11 @@ function startGame() {
   allEnemies[1].move(-1, 2);
   allEnemies[2].move(-1, 3);
   allEnemies[3].move(-1, 1);
+
+  allBonuses[0].move(-1, allBonuses[0].col);
+  allBonuses[1].move(-1, allBonuses[1].col);
+  allBonuses[2].move(-1, allBonuses[2].col);
+  allBonuses[3].move(-1, allBonuses[3].col);
 
   player.setIdle();
 
