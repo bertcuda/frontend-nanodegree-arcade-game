@@ -42,6 +42,8 @@ function Shape() {
   this.row = 0;
   this.x = 0;
   this.y = 0;
+  this.sprite = '';
+  this.rowOffset = 0;
 }
 
 // Move shape to col, row and adjust y by row offset for shape
@@ -96,11 +98,8 @@ Enemy.prototype.update = function (dt) {
   this.move(newCol, this.row, this.rowOffset);
 
   // Check for collision with player
-  if ((player.currentState() === playerState.moving ||
-      player.currentState() === playerState.idle) &&
-    player.row === this.row &&
-    Math.abs(player.col - this.col) < 0.7) {
-    // Player has just crashed; start crashing
+  if (player.collision(this.col, this.row)) {
+    // Display crashing state
     player.pushCrashing();
   };
 };
@@ -156,10 +155,8 @@ Bonus.prototype.update = function (dt) {
   if (this.visible) {
     this.move(this.bonusCol, this.bonusRow, this.rowOffset);
     // Check for bonus
-    if (player.currentState() === playerState.moving &&
-      player.row === this.row &&
-      Math.abs(player.col - this.col) < 0.7) {
-      // Player has just earned bonus; display player bonus state and award points
+    if (player.collision(this.col, this.row)) {
+      // Display player bonus state and award points
       player.pushBonus();
       game.score = game.score + this.bonusPoints;
       this.earned = true;
@@ -168,6 +165,7 @@ Bonus.prototype.update = function (dt) {
 };
 
 // Draw the shape on the screen, required method for game
+// Only draw a bonus if it's time for it to be visible and not yet earned
 Bonus.prototype.render = function () {
   if (this.visible && !this.earned) {
     var colOffset = 20;
@@ -225,6 +223,15 @@ Player.prototype.handleInput = function (playerInput) {
   this.currentState().handleInput(playerInput);
 };
 
+// Check for collision with an enemy or bonus
+Player.prototype.collision = function (col, row) {
+  var shapeOverlap = 0.7; // allow some shape overlap before collision
+  return (this.currentState() === playerState.moving ||
+      this.currentState() === playerState.idle) &&
+    this.row === row &&
+    Math.abs(this.col - col) < shapeOverlap;
+};
+
 //
 // Player states use the State design pattern for sprite and state timer
 // PlayerState - superclass
@@ -232,6 +239,7 @@ Player.prototype.handleInput = function (playerInput) {
 
 function PlayerState() {
   // Timer for length of time to remain in the state
+  // Player sprite and offset in PlayerState object; position in Player object
   this.timer = 0;
   this.sprite = '';
   this.rowOffset = 0;
@@ -274,10 +282,11 @@ PlayerIdle.prototype = Object.create(PlayerState.prototype);
 PlayerIdle.prototype.constructor = PlayerIdle;
 
 PlayerIdle.prototype.update = function (dt) {
-  // Stay still until timer expires and then take next random move
+  // Remain still until timer expires and then take next random move
 
   if (player.currentState().chargeTime(dt) <= 0) {
 
+    // Generate a random move
     function randomPlayerInput() {
       // Calculate a semi-random -1, 0 or 1
       var randomPosZeroOrNegInput = Math.round(Math.random() * 2) - 1;
@@ -301,37 +310,9 @@ PlayerIdle.prototype.update = function (dt) {
     // Reset timer to wait for next move
     player.currentState().timer = game.ticksPerSecond * 1;
 
-    switch (playerInput) {
-    case 'up':
-      if (player.row > 1) {
-        player.row--;
-      } else if (player.row === 1) {
-        player.row = 0;
-        if (player.col === 1 || player.col === 3) {
-          // Player has just reached home; start heart
-          player.pushHome();
-        } else {
-          // Player has just fallen into the water; start splashing
-          player.pushSplashing();
-        };
-      };
-      break;
-    case 'left':
-      if (player.col > 0) {
-        player.col--;
-      };
-      break;
-    case 'right':
-      if (player.col < game.numCols - 1) {
-        player.col++;
-      };
-      break;
-    case 'down':
-      // No-op for 'down' action (shouldn't happen)
-      break;
-    default:
-    }
+    ProcessPlayerInput(playerInput);
   };
+
   player.move(
     player.col, player.row, player.currentState().rowOffset);
 };
@@ -428,23 +409,38 @@ PlayerMoving.prototype.update = function (dt) {
 
 // Handle player input by updating game square col or row
 PlayerMoving.prototype.handleInput = function (playerInput) {
-  function addStepPoints() {
-    if (player.row > 0 && player.row < 4) {
+  ProcessPlayerInput(playerInput);
+};
+
+// Handle player input by updating game square col or row
+function ProcessPlayerInput(playerInput) {
+
+  var gameInProgress = player.currentState() === playerState.moving;
+
+  function processStepPoints() {
+    if (gameInProgress && player.row > 0 && player.row < 4) {
       game.score = game.score + game.pointsStep;
     };
   }
+
+  function processHomePoints() {
+    if (gameInProgress) {
+      game.score = game.score + game.pointsHome +
+        Math.round(game.timer / game.ticksPerSecond);
+    };
+  }
+
   switch (playerInput) {
   case 'up':
     if (player.row > 1) {
       player.row--;
-      addStepPoints();
+      processStepPoints();
     } else if (player.row === 1) {
       player.row = 0;
       if (player.col % 2) {
         // Player has just reached home; start home state (heart)
         player.pushHome();
-        game.score = game.score + game.pointsHome +
-          Math.round(game.timer / game.ticksPerSecond);
+        processHomePoints();
       } else {
         // Player has just fallen into the water; start splashing
         player.pushSplashing();
@@ -454,19 +450,19 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
   case 'down':
     if (player.row < game.numRows - 1) {
       player.row++;
-      addStepPoints();
+      processStepPoints();
     };
     break;
   case 'left':
     if (player.col > 0) {
       player.col--;
-      addStepPoints();
+      processStepPoints();
     };
     break;
   case 'right':
     if (player.col < game.numCols - 1) {
       player.col++;
-      addStepPoints();
+      processStepPoints();
     };
     break;
   case 'space':
