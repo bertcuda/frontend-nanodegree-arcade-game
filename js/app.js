@@ -3,22 +3,26 @@
 //
 
 var game = {
-  "numRows": 6,
-  "numCols": 5,
-  "startingCol": 2,
-  "startingRow": 5,
-  "colWidth": 101,
-  "rowHeight": 83,
-  "scalingFactor": 1.2,
-  "ticksPerSecond": 10,
-  "playingTime": 300,
-  "pointsStep": 10,
-  "pointsHome": 50,
+  "NUM_ROWS": 6,
+  "NUM_COLS": 5,
+  "STARTING_COL": 2,
+  "STARTING_ROW": 5,
+  "COL_WIDTH": 101,
+  "ROW_HEIGHT": 83,
+  "SCALING_FACTOR": 1.2,
+  "TICKS_PER_SECOND": 10,
+  "PLAYING_TIME_TICKS": 300,
+  "POINTS_STEP": 10,
+  "POINTS_HOME": 50,
+  "POINTS_GEM_BLUE": 100,
+  "POINTS_GEM_GREEN": 200,
+  "POINTS_GEM_ORANGE": 300,
+  "POINTS_KEY": 500,
   "timer": 0,
   "score": 0,
   "highScore": 0,
   "begin": function () {
-    game.timer = game.playingTime;
+    game.timer = game.PLAYING_TIME_TICKS;
     game.score = 0;
     allBonuses.forEach(function (bonus) {
       bonus.resetBonus();
@@ -52,8 +56,8 @@ function Shape() {
 Shape.prototype.move = function (col, row, rowOffset) {
   this.col = col;
   this.row = row;
-  this.x = game.colWidth * this.col;
-  this.y = game.rowHeight * this.row + rowOffset;
+  this.x = game.COL_WIDTH * this.col;
+  this.y = game.ROW_HEIGHT * this.row + rowOffset;
 };
 
 //
@@ -92,7 +96,7 @@ Enemy.prototype.update = function (dt) {
 
   // Update col position; after moving off the right side, cycle back
   var newCol = this.col + this.speed * dt;
-  if (newCol >= game.numCols) {
+  if (newCol >= game.NUM_COLS) {
     newCol = -1;
   };
 
@@ -115,14 +119,14 @@ function Bonus(s, t, p) {
   Shape.call(this); // call superclass constructor
   // The image/sprite for our bonuses, this uses
   // a helper we've provided to easily load images
-  var visibleTime = game.ticksPerSecond * 2;
-  this.bonusCol = 2;
-  this.bonusRow = 2;
+  var visibleTime = game.TICKS_PER_SECOND * 2;
+  this.bonusCol = 2; // TODO: random bonus position, perhaps when leveling up
+  this.bonusRow = 2; // TODO: random bonus position, perhaps when leveling up
   this.sprite = s;
   this.colOffset = 20;
   this.rowOffset = 25;
   // Bonus will appear after t seconds
-  this.beginTime = game.playingTime - t * game.ticksPerSecond;
+  this.beginTime = game.PLAYING_TIME_TICKS - t * game.TICKS_PER_SECOND;
   this.endTime = this.beginTime - visibleTime;
   this.bonusPoints = p;
   this.visible = false;
@@ -234,20 +238,20 @@ Player.prototype.collision = function (col, row) {
 
 // Move player and add points while idle or moving (no points when idle)
 // Used by idle and moving player states
-function ProcessPlayerInput(playerInput) {
+function processPlayerInput(playerInput) {
 
   var gameInProgress = player.currentState() === playerState.moving;
 
   function processStepPoints() {
     if (gameInProgress && player.row > 0 && player.row < 4) {
-      game.score = game.score + game.pointsStep;
+      game.score = game.score + game.POINTS_STEP;
     };
   }
 
   function processHomePoints() {
     if (gameInProgress) {
-      game.score = game.score + game.pointsHome +
-        Math.round(game.timer / game.ticksPerSecond);
+      game.score = game.score + game.POINTS_HOME +
+        Math.round(game.timer / game.TICKS_PER_SECOND);
     };
   }
 
@@ -269,7 +273,7 @@ function ProcessPlayerInput(playerInput) {
     };
     break;
   case 'down':
-    if (player.row < game.numRows - 1) {
+    if (player.row < game.NUM_ROWS - 1) {
       player.row++;
       processStepPoints();
     };
@@ -281,7 +285,7 @@ function ProcessPlayerInput(playerInput) {
     };
     break;
   case 'right':
-    if (player.col < game.numCols - 1) {
+    if (player.col < game.NUM_COLS - 1) {
       player.col++;
       processStepPoints();
     };
@@ -295,7 +299,7 @@ function ProcessPlayerInput(playerInput) {
 
 // Handle player input of Space key to start game
 // Used in idle mode while in crashing, splashing, home and bonus player states
-function ProcessSpaceBar(playerInput) {
+function processSpaceBar(playerInput) {
   switch (playerInput) {
   case 'space':
     if (player.previousState() === playerState.idle) {
@@ -389,9 +393,9 @@ PlayerIdle.prototype.update = function (dt) {
     var playerInput = randomPlayerInput();
 
     // Reset timer to wait for next move
-    player.currentState().timer = game.ticksPerSecond * 1;
+    player.currentState().timer = game.TICKS_PER_SECOND * 1;
 
-    ProcessPlayerInput(playerInput);
+    processPlayerInput(playerInput);
   };
 
   player.move(
@@ -490,7 +494,7 @@ PlayerMoving.prototype.update = function (dt) {
 
 // Handle player input by updating game square col or row
 PlayerMoving.prototype.handleInput = function (playerInput) {
-  ProcessPlayerInput(playerInput);
+  processPlayerInput(playerInput);
 };
 
 // Render game messages while in moving state
@@ -517,7 +521,7 @@ PlayerCrashing.prototype.update = function (dt) {
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(
-      game.startingCol, game.startingRow, player.currentState().rowOffset);
+      game.STARTING_COL, game.STARTING_ROW, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -532,7 +536,7 @@ PlayerCrashing.prototype.update = function (dt) {
 
 // While idle, handle player input of Space key to start game
 PlayerCrashing.prototype.handleInput = function (playerInput) {
-  ProcessSpaceBar(playerInput);
+  processSpaceBar(playerInput);
 };
 
 // Render game messages while in crashing state
@@ -563,7 +567,7 @@ PlayerSplashing.prototype.update = function (dt) {
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(
-      game.startingCol, game.startingRow, player.currentState().rowOffset);
+      game.STARTING_COL, game.STARTING_ROW, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -577,7 +581,7 @@ PlayerSplashing.prototype.update = function (dt) {
 
 // While idle, handle player input of Space key to start game
 PlayerSplashing.prototype.handleInput = function (playerInput) {
-  ProcessSpaceBar(playerInput);
+  processSpaceBar(playerInput);
 };
 
 // Render game messages while in splashing state
@@ -608,7 +612,7 @@ PlayerHome.prototype.update = function (dt) {
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
     player.move(
-      game.startingCol, game.startingRow, player.currentState().rowOffset);
+      game.STARTING_COL, game.STARTING_ROW, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -622,7 +626,7 @@ PlayerHome.prototype.update = function (dt) {
 
 // While idle and just after reaching "home", handle player input of Space key to start game (rare, but it does happen)
 PlayerHome.prototype.handleInput = function (playerInput) {
-  ProcessSpaceBar(playerInput);
+  processSpaceBar(playerInput);
 };
 
 // Render game messages while in home state
@@ -679,7 +683,7 @@ PlayerBonus.prototype.renderMessages = function () {
 // Player automatically moves randomly until game starts
 Player.prototype.setIdle = function () {
   // Make sure idle is the only state on the state stack
-  var timeBetweenMoves = game.ticksPerSecond * 1;
+  var timeBetweenMoves = game.TICKS_PER_SECOND * 1;
   if (this.state.length === 0) {
     this.state.push(playerState.idle);
   } else {
@@ -691,17 +695,19 @@ Player.prototype.setIdle = function () {
   this.currentState().timer = timeBetweenMoves;
   this.currentState().sprite = playerChars[this.char];
   this.currentState().rowOffset = -10;
-  this.move(game.startingCol, game.startingRow, this.currentState().rowOffset);
+  this.move(
+    game.STARTING_COL, game.STARTING_ROW, this.currentState().rowOffset);
 };
 
 // Player starts cycling through character sprite images to choose one
 Player.prototype.pushSelecting = function () {
-  var timeToSelect = game.ticksPerSecond * 30;
+  var timeToSelect = game.TICKS_PER_SECOND * 30; // Back to idle if taking too long
   this.state.push(playerState.selecting);
   this.currentState().timer = timeToSelect;
   this.currentState().sprite = playerChars[this.char];
   this.currentState().rowOffset = -10;
-  this.move(game.startingCol, game.startingRow, this.currentState().rowOffset);
+  this.move(
+    game.STARTING_COL, game.STARTING_ROW, this.currentState().rowOffset);
 };
 
 // Player starts moving according to input from the arrow keys
@@ -714,7 +720,7 @@ Player.prototype.pushMoving = function () {
 
 // While player is "crashing", change player image for crashTime ticks without responding to player input
 Player.prototype.pushCrashing = function () {
-  var crashTime = game.ticksPerSecond * 2;
+  var crashTime = game.TICKS_PER_SECOND * 2;
   this.state.push(playerState.crashing);
   this.currentState().timer = crashTime;
   this.currentState().sprite = 'images/crash.png';
@@ -723,7 +729,7 @@ Player.prototype.pushCrashing = function () {
 
 // While player is "splashing", change player image for splashTime ticks without responding to player input
 Player.prototype.pushSplashing = function () {
-  var splashTime = game.ticksPerSecond * 2;
+  var splashTime = game.TICKS_PER_SECOND * 2;
   this.state.push(playerState.splashing);
   this.currentState().timer = splashTime;
   this.currentState().sprite = 'images/splash.png';
@@ -732,7 +738,7 @@ Player.prototype.pushSplashing = function () {
 
 // While player is "home", change player image for splashTime ticks without responding to player input
 Player.prototype.pushHome = function () {
-  var homeTime = game.ticksPerSecond * 2;
+  var homeTime = game.TICKS_PER_SECOND * 2;
   this.state.push(playerState.home);
   this.currentState().timer = homeTime;
   this.currentState().sprite = 'images/Heart.png';
@@ -741,7 +747,7 @@ Player.prototype.pushHome = function () {
 
 // After player obtains a bonus, change player image for bonusTime ticks without responding to player input
 Player.prototype.pushBonus = function () {
-  var bonusTime = game.ticksPerSecond * 0.25;
+  var bonusTime = game.TICKS_PER_SECOND * 0.25;
   this.state.push(playerState.bonus);
   this.currentState().timer = bonusTime;
   this.currentState().sprite = 'images/Star.png';
@@ -773,19 +779,19 @@ function renderMessage(message, pts, x, y) {
 
 function renderIdleMessages() {
   var message = 'Bugs, Bugs, Bugs!';
-  renderMessage(message, 36, (ctx.canvas.width / game.scalingFactor / 2), game.rowHeight * 2 - 55);
+  renderMessage(message, 36, (ctx.canvas.width / game.SCALING_FACTOR / 2), game.ROW_HEIGHT * 2 - 55);
   message = 'Score: ' + game.score + '    High Score: ' + game.highScore + '    Space to play';
-  renderMessage(message, 18, (ctx.canvas.width / game.scalingFactor / 2), ctx.canvas.height / game.scalingFactor - 30);
+  renderMessage(message, 18, (ctx.canvas.width / game.SCALING_FACTOR / 2), ctx.canvas.height / game.SCALING_FACTOR - 30);
 }
 
 function renderSelectingMessages() {
   var message = 'Press ▲▼ to select character / Space to start';
-  renderMessage(message, 18, (ctx.canvas.width / game.scalingFactor / 2), ctx.canvas.height / game.scalingFactor - 30);
+  renderMessage(message, 18, (ctx.canvas.width / game.SCALING_FACTOR / 2), ctx.canvas.height / game.SCALING_FACTOR - 30);
 }
 
 function renderPlayingMessages() {
-  var message = 'Score: ' + game.score + '                  Time: ' + Math.round(game.timer / game.ticksPerSecond) + ' seconds';
-  renderMessage(message, 18, (ctx.canvas.width / game.scalingFactor / 2), ctx.canvas.height / game.scalingFactor - 30);
+  var message = 'Score: ' + game.score + '                  Time: ' + Math.round(game.timer / game.TICKS_PER_SECOND) + ' seconds';
+  renderMessage(message, 18, (ctx.canvas.width / game.SCALING_FACTOR / 2), ctx.canvas.height / game.SCALING_FACTOR - 30);
 }
 
 // Now instantiate your objects.
@@ -795,10 +801,10 @@ function renderPlayingMessages() {
 var allEnemies = [new Enemy(), new Enemy(), new Enemy(), new Enemy()];
 
 var allBonuses = [
-  new Bonus('images/Gem Blue.png', 5, 100),
-  new Bonus('images/Gem Green.png', 10, 200),
-  new Bonus('images/Gem Orange.png', 15, 300),
-  new Bonus('images/Key.png', 20, 500)
+  new Bonus('images/Gem Blue.png', 5, game.POINTS_GEM_BLUE),
+  new Bonus('images/Gem Green.png', 10, game.POINTS_GEM_GREEN),
+  new Bonus('images/Gem Orange.png', 15, game.POINTS_GEM_ORANGE),
+  new Bonus('images/Key.png', 20, game.POINTS_KEY)
 ];
 
 var player = new Player();
