@@ -5,6 +5,8 @@
 var game = {
   "numRows": 6,
   "numCols": 5,
+  "startingCol": 2,
+  "startingRow": 5,
   "colWidth": 101,
   "rowHeight": 83,
   "scalingFactor": 1.2,
@@ -117,6 +119,7 @@ function Bonus(s, t, p) {
   this.bonusCol = 2;
   this.bonusRow = 2;
   this.sprite = s;
+  this.colOffset = 20;
   this.rowOffset = 25;
   // Bonus will appear after t seconds
   this.beginTime = game.playingTime - t * game.ticksPerSecond;
@@ -135,8 +138,6 @@ Bonus.prototype.constructor = Bonus;
 
 // Set the visibility and earned status of bonus shape
 Bonus.prototype.resetBonus = function () {
-  // TODO: this.col = random col
-  // TODO: this.row = random row
   this.visible = false;
   this.earned = false;
 };
@@ -168,8 +169,7 @@ Bonus.prototype.update = function (dt) {
 // Only draw a bonus if it's time for it to be visible and not yet earned
 Bonus.prototype.render = function () {
   if (this.visible && !this.earned) {
-    var colOffset = 20;
-    ctx.drawImage(Resources.get(this.sprite), this.x + colOffset, this.y);
+    ctx.drawImage(Resources.get(this.sprite), this.x + this.colOffset, this.y);
   };
 };
 
@@ -210,14 +210,14 @@ Player.prototype.previousState = function () {
   return this.state[this.state.length - 2];
 };
 
-// Update the player's position, required method for game
+// Let PlayerState update the player's position, required method for game
 // Parameter: dt, a time delta between ticks
 Player.prototype.update = function (dt) {
   // Let the player state subclass take care of updates, if needed
   this.currentState().update(dt);
 };
 
-// Handle player input by updating game square col or row
+// Pass player input to the PlayerState method
 Player.prototype.handleInput = function (playerInput) {
   // Let the player state subclass take care of player input, if needed
   this.currentState().handleInput(playerInput);
@@ -231,6 +231,87 @@ Player.prototype.collision = function (col, row) {
     this.row === row &&
     Math.abs(this.col - col) < shapeOverlap;
 };
+
+// Move player and add points while idle or moving (no points when idle)
+// Used by idle and moving player states
+function ProcessPlayerInput(playerInput) {
+
+  var gameInProgress = player.currentState() === playerState.moving;
+
+  function processStepPoints() {
+    if (gameInProgress && player.row > 0 && player.row < 4) {
+      game.score = game.score + game.pointsStep;
+    };
+  }
+
+  function processHomePoints() {
+    if (gameInProgress) {
+      game.score = game.score + game.pointsHome +
+        Math.round(game.timer / game.ticksPerSecond);
+    };
+  }
+
+  switch (playerInput) {
+  case 'up':
+    if (player.row > 1) {
+      player.row--;
+      processStepPoints();
+    } else if (player.row === 1) {
+      player.row = 0;
+      if (player.col % 2) {
+        // Player has just reached home; start home state (heart)
+        player.pushHome();
+        processHomePoints();
+      } else {
+        // Player has just fallen into the water; start splashing
+        player.pushSplashing();
+      };
+    };
+    break;
+  case 'down':
+    if (player.row < game.numRows - 1) {
+      player.row++;
+      processStepPoints();
+    };
+    break;
+  case 'left':
+    if (player.col > 0) {
+      player.col--;
+      processStepPoints();
+    };
+    break;
+  case 'right':
+    if (player.col < game.numCols - 1) {
+      player.col++;
+      processStepPoints();
+    };
+    break;
+  case 'space':
+    // Ignore
+    break;
+  default:
+  }
+};
+
+// Handle player input of Space key to start game
+// Used in idle mode while in crashing, splashing, home and bonus player states
+function ProcessSpaceBar(playerInput) {
+  switch (playerInput) {
+  case 'space':
+    if (player.previousState() === playerState.idle) {
+      player.popState();
+      player.pushSelecting();
+    };
+    break;
+    // Ignore all other keys
+  case 'up':
+  case 'down':
+  case 'left':
+  case 'right':
+    break;
+  default:
+  };
+}
 
 //
 // Player states use the State design pattern for sprite and state timer
@@ -412,66 +493,6 @@ PlayerMoving.prototype.handleInput = function (playerInput) {
   ProcessPlayerInput(playerInput);
 };
 
-// Handle player input by updating game square col or row
-function ProcessPlayerInput(playerInput) {
-
-  var gameInProgress = player.currentState() === playerState.moving;
-
-  function processStepPoints() {
-    if (gameInProgress && player.row > 0 && player.row < 4) {
-      game.score = game.score + game.pointsStep;
-    };
-  }
-
-  function processHomePoints() {
-    if (gameInProgress) {
-      game.score = game.score + game.pointsHome +
-        Math.round(game.timer / game.ticksPerSecond);
-    };
-  }
-
-  switch (playerInput) {
-  case 'up':
-    if (player.row > 1) {
-      player.row--;
-      processStepPoints();
-    } else if (player.row === 1) {
-      player.row = 0;
-      if (player.col % 2) {
-        // Player has just reached home; start home state (heart)
-        player.pushHome();
-        processHomePoints();
-      } else {
-        // Player has just fallen into the water; start splashing
-        player.pushSplashing();
-      };
-    };
-    break;
-  case 'down':
-    if (player.row < game.numRows - 1) {
-      player.row++;
-      processStepPoints();
-    };
-    break;
-  case 'left':
-    if (player.col > 0) {
-      player.col--;
-      processStepPoints();
-    };
-    break;
-  case 'right':
-    if (player.col < game.numCols - 1) {
-      player.col++;
-      processStepPoints();
-    };
-    break;
-  case 'space':
-    // Ignore
-    break;
-  default:
-  }
-};
-
 // Render game messages while in moving state
 PlayerMoving.prototype.renderMessages = function () {
   renderPlayingMessages();
@@ -495,10 +516,12 @@ PlayerCrashing.prototype.update = function (dt) {
   var currentTimer = player.currentState().chargeTime(dt);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5, player.currentState().rowOffset);
+    player.move(
+      game.startingCol, game.startingRow, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
+  // If game is in play, reduce game time and check for end of game
   if (player.previousState() !== playerState.idle) {
     if (game.chargeTime(dt) <= 0) {
       game.end();
@@ -507,22 +530,9 @@ PlayerCrashing.prototype.update = function (dt) {
   };
 };
 
-// Handle Space to start game
+// While idle, handle player input of Space key to start game
 PlayerCrashing.prototype.handleInput = function (playerInput) {
-  switch (playerInput) {
-  case 'space':
-    if (player.previousState() === playerState.idle) {
-      player.popState();
-      player.pushSelecting();
-    };
-    break;
-  case 'up':
-  case 'down':
-  case 'left':
-  case 'right':
-    break;
-  default:
-  }
+  ProcessSpaceBar(playerInput);
 };
 
 // Render game messages while in crashing state
@@ -552,7 +562,8 @@ PlayerSplashing.prototype.update = function (dt) {
   var currentTimer = player.currentState().chargeTime(dt);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5, player.currentState().rowOffset);
+    player.move(
+      game.startingCol, game.startingRow, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -564,21 +575,9 @@ PlayerSplashing.prototype.update = function (dt) {
   };
 };
 
-// Handle Space to start game
+// While idle, handle player input of Space key to start game
 PlayerSplashing.prototype.handleInput = function (playerInput) {
-  switch (playerInput) {
-  case 'space':
-    if (player.previousState() === playerState.idle) {
-      player.popState();
-      player.pushSelecting();
-    };
-  case 'up':
-  case 'down':
-  case 'left':
-  case 'right':
-    break;
-  default:
-  }
+  ProcessSpaceBar(playerInput);
 };
 
 // Render game messages while in splashing state
@@ -608,7 +607,8 @@ PlayerHome.prototype.update = function (dt) {
   var currentTimer = player.currentState().chargeTime(dt);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    player.move(2, 5, player.currentState().rowOffset);
+    player.move(
+      game.startingCol, game.startingRow, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -618,6 +618,11 @@ PlayerHome.prototype.update = function (dt) {
       player.setIdle();
     };
   };
+};
+
+// While idle and just after reaching "home", handle player input of Space key to start game (rare, but it does happen)
+PlayerHome.prototype.handleInput = function (playerInput) {
+  ProcessSpaceBar(playerInput);
 };
 
 // Render game messages while in home state
@@ -647,7 +652,6 @@ PlayerBonus.prototype.update = function (dt) {
   var currentTimer = player.currentState().chargeTime(dt);
   if (currentTimer <= 0) {
     player.state.pop(); // go back to previous idle or moving state
-    // player.move(2, 5, player.currentState().rowOffset);
   };
   player.move(
     player.col, player.row, player.currentState().rowOffset);
@@ -674,7 +678,7 @@ PlayerBonus.prototype.renderMessages = function () {
 
 // Player automatically moves randomly until game starts
 Player.prototype.setIdle = function () {
-  // Make sure Idle is the only state on the state stack
+  // Make sure idle is the only state on the state stack
   var timeBetweenMoves = game.ticksPerSecond * 1;
   if (this.state.length === 0) {
     this.state.push(playerState.idle);
@@ -687,22 +691,20 @@ Player.prototype.setIdle = function () {
   this.currentState().timer = timeBetweenMoves;
   this.currentState().sprite = playerChars[this.char];
   this.currentState().rowOffset = -10;
-  this.move(2, 5, this.currentState().rowOffset);
+  this.move(game.startingCol, game.startingRow, this.currentState().rowOffset);
 };
 
 // Player starts cycling through character sprite images to choose one
-// TODO: use a generic "push" method with parameters
 Player.prototype.pushSelecting = function () {
   var timeToSelect = game.ticksPerSecond * 30;
   this.state.push(playerState.selecting);
   this.currentState().timer = timeToSelect;
   this.currentState().sprite = playerChars[this.char];
   this.currentState().rowOffset = -10;
-  this.move(2, 5, this.currentState().rowOffset);
+  this.move(game.startingCol, game.startingRow, this.currentState().rowOffset);
 };
 
 // Player starts moving according to input from the arrow keys
-// TODO: use a generic "push" method with parameters
 Player.prototype.pushMoving = function () {
   this.state.push(playerState.moving);
   this.currentState().timer = 0;
@@ -720,7 +722,6 @@ Player.prototype.pushCrashing = function () {
 };
 
 // While player is "splashing", change player image for splashTime ticks without responding to player input
-// TODO: use a generic "push" method with parameters
 Player.prototype.pushSplashing = function () {
   var splashTime = game.ticksPerSecond * 2;
   this.state.push(playerState.splashing);
@@ -730,7 +731,6 @@ Player.prototype.pushSplashing = function () {
 };
 
 // While player is "home", change player image for splashTime ticks without responding to player input
-// TODO: use a generic "push" method with parameters
 Player.prototype.pushHome = function () {
   var homeTime = game.ticksPerSecond * 2;
   this.state.push(playerState.home);
@@ -740,7 +740,6 @@ Player.prototype.pushHome = function () {
 };
 
 // After player obtains a bonus, change player image for bonusTime ticks without responding to player input
-// TODO: use a generic "push" method with parameters
 Player.prototype.pushBonus = function () {
   var bonusTime = game.ticksPerSecond * 0.25;
   this.state.push(playerState.bonus);

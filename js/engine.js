@@ -25,7 +25,7 @@ var Engine = (function (global) {
     ctx = canvas.getContext('2d'),
     lastTime;
 
-  var scalingFactor = 1.2;
+  var scalingFactor = game.scalingFactor;
 
   canvas.width = 505 * scalingFactor;
   canvas.height = 606 * scalingFactor;
@@ -122,8 +122,8 @@ var Engine = (function (global) {
         'images/grass-block.png', // Row 1 of 2 of grass
         'images/grass-block.png' // Row 2 of 2 of grass
       ],
-      numRows = 6,
-      numCols = 5,
+      numRows = game.numRows,
+      numCols = game.numCols,
       row, col;
 
     /* Loop through the number of rows and columns we've defined above
@@ -140,7 +140,8 @@ var Engine = (function (global) {
          * we're using them over and over.
          */
         ctx.drawImage(
-          Resources.get(rowImages[row]), col * 101, row * 83);
+          Resources.get(
+            rowImages[row]), col * game.colWidth, row * game.rowHeight);
       }
     }
 
@@ -153,8 +154,12 @@ var Engine = (function (global) {
   }
 
   function renderRocks() {
-    ctx.drawImage(Resources.get('images/Rock.png'), 1 * 101, 0 * 83 - 16);
-    ctx.drawImage(Resources.get('images/Rock.png'), 3 * 101, 0 * 83 - 16);
+    ctx.drawImage(
+      Resources.get(
+        'images/Rock.png'), 1 * game.colWidth, 0 * game.rowHeight - 16);
+    ctx.drawImage(
+      Resources.get(
+        'images/Rock.png'), 3 * game.colWidth, 0 * game.rowHeight - 16);
   }
 
   /* This function is called by the render function and is called on each game
